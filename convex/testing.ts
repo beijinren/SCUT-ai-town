@@ -20,6 +20,13 @@ import { GameId } from './aiTown/ids';
 // Clear all of the tables except for the embeddings cache.
 const excludedTables: Array<TableNames> = ['embeddingsCache'];
 
+async function deleteAllRowsInTable(ctx: { db: any }, tableName: TableNames) {
+  const rows = await ctx.db.query(tableName).collect();
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+}
+
 export const wipeAllTables = internalMutation({
   handler: async (ctx) => {
     for (const tableName of Object.keys(schema.tables)) {
@@ -28,6 +35,19 @@ export const wipeAllTables = internalMutation({
       }
       await ctx.scheduler.runAfter(0, internal.testing.deletePage, { tableName, cursor: null });
     }
+  },
+});
+
+// 开发期同步重置，避免异步清表后立刻 init 时拿到旧 world。
+export const hardResetWorldState = mutation({
+  handler: async (ctx) => {
+    for (const tableName of Object.keys(schema.tables) as TableNames[]) {
+      if (excludedTables.includes(tableName)) {
+        continue;
+      }
+      await deleteAllRowsInTable(ctx, tableName);
+    }
+    return { ok: true };
   },
 });
 

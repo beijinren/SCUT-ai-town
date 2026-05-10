@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values';
 import { internalMutation, mutation, query } from './_generated/server';
 import { characters } from '../data/characters';
+import { defaultSceneTemplate } from '../data/scenes';
 import { insertInput } from './aiTown/insertInput';
 import {
   DEFAULT_NAME,
@@ -9,6 +10,7 @@ import {
   WORLD_HEARTBEAT_INTERVAL,
 } from './constants';
 import { playerId } from './aiTown/ids';
+import { buildSceneViewForRole } from './aiTown/sceneVisibility';
 import { kickEngine, startEngine, stopEngine } from './aiTown/main';
 import { engineInsertInput } from './engine/abstractGame';
 
@@ -203,6 +205,19 @@ export const worldState = query({
   },
 });
 
+export const currentSceneState = query({
+  args: {
+    worldId: v.id('worlds'),
+  },
+  handler: async (ctx, args) => {
+    const world = await ctx.db.get(args.worldId);
+    if (!world) {
+      throw new Error(`Invalid world ID: ${args.worldId}`);
+    }
+    return world.sceneState ?? null;
+  },
+});
+
 export const gameDescriptions = query({
   args: {
     worldId: v.id('worlds'),
@@ -224,6 +239,47 @@ export const gameDescriptions = query({
       throw new Error(`No map for world: ${args.worldId}`);
     }
     return { worldMap, playerDescriptions, agentDescriptions };
+  },
+});
+
+export const sceneDebugViews = query({
+  args: {
+    worldId: v.id('worlds'),
+  },
+  handler: async (ctx, args) => {
+    const scene = defaultSceneTemplate.definition.scene;
+    const world = await ctx.db.get(args.worldId);
+    if (!world) {
+      throw new Error(`Invalid world ID: ${args.worldId}`);
+    }
+    const playerDescriptions = await ctx.db
+      .query('playerDescriptions')
+      .withIndex('worldId', (q) => q.eq('worldId', args.worldId))
+      .collect();
+    const playerNameById = new Map(playerDescriptions.map((description) => [description.playerId, description.name]));
+    return {
+      scene: {
+        id: scene.id,
+        type: scene.type,
+        title: scene.title,
+        publicSummary: scene.publicSummary,
+        location: scene.location,
+        tone: scene.tone,
+        currentPhase: scene.currentPhase,
+        pressureSource: scene.pressureSource,
+        hiddenFacts: scene.facts.filter((fact) => fact.visibility === 'hidden'),
+      },
+      views: scene.roles.map((role) =>
+        buildSceneViewForRole(scene, role.id),
+      ),
+      runtimeInteractionDecisions: world.agents
+        .map((agent) => ({
+          playerId: agent.playerId,
+          playerName: playerNameById.get(agent.playerId) ?? agent.playerId,
+          decision: agent.lastInteractionDecision ?? null,
+        }))
+        .filter((item) => item.decision !== null),
+    };
   },
 });
 

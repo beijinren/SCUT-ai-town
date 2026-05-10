@@ -22,6 +22,9 @@ import { distance } from '../util/geometry';
 import { internal } from '../_generated/api';
 import { movePlayer } from './movement';
 import { insertInput } from './insertInput';
+import { demoMode } from './demoMode';
+import { defaultConversationRules } from './defaultConversationRules';
+import { buildConversationDecisionContext } from './conversationDecisionContext';
 
 export class Agent {
   id: GameId<'agents'>;
@@ -29,6 +32,14 @@ export class Agent {
   toRemember?: GameId<'conversations'>;
   lastConversation?: number;
   lastInviteAttempt?: number;
+  lastInteractionDecision?: {
+    timestamp: number;
+    shouldInitiate: boolean;
+    selectedPlayerId?: string;
+    summary: string;
+    reasons: string[];
+    topCandidateScores: { playerId: string; score: number }[];
+  };
   inProgressOperation?: {
     name: string;
     operationId: string;
@@ -36,7 +47,7 @@ export class Agent {
   };
 
   constructor(serialized: SerializedAgent) {
-    const { id, lastConversation, lastInviteAttempt, inProgressOperation } = serialized;
+    const { id, lastConversation, lastInviteAttempt, lastInteractionDecision, inProgressOperation } = serialized;
     const playerId = parseGameId('players', serialized.playerId);
     this.id = parseGameId('agents', id);
     this.playerId = playerId;
@@ -46,6 +57,7 @@ export class Agent {
         : undefined;
     this.lastConversation = lastConversation;
     this.lastInviteAttempt = lastInviteAttempt;
+    this.lastInteractionDecision = lastInteractionDecision;
     this.inProgressOperation = inProgressOperation;
   }
 
@@ -87,11 +99,16 @@ export class Agent {
           .map((p) => p.serialize()),
         agent: this.serialize(),
         map: game.worldMap.serialize(),
+        sceneState: game.world.sceneState,
       });
       return;
     }
     // Check to see if we have a conversation we need to remember.
     if (this.toRemember) {
+      if (demoMode.disableAgentConversationMemory) {
+        delete this.toRemember;
+        return;
+      }
       // Fire off the action to remember the conversation.
       console.log(`Agent ${this.id} remembering conversation ${this.toRemember}`);
       this.startOperation(game, now, 'agentRememberConversation', {
@@ -104,6 +121,13 @@ export class Agent {
       return;
     }
     if (conversation && member) {
+      if (demoMode.disableAgentConversations) {
+        delete conversation.isTyping;
+        game.world.conversations.delete(conversation.id);
+        this.lastConversation = now;
+        delete this.inProgressOperation;
+        return;
+      }
       const [otherPlayerId, otherMember] = [...conversation.participants.entries()].find(
         ([id]) => id !== player.id,
       )!;
@@ -160,15 +184,30 @@ export class Agent {
       }
       if (member.status.kind === 'participating') {
         const started = member.status.started;
+        const decisionContext = buildConversationDecisionContext({
+          game,
+          conversation,
+          playerId: player.id,
+        });
+        const speakingOpportunity = defaultConversationRules.evaluateSpeakingOpportunity({
+          playerId: player.id,
+          creatorId: conversation.creator,
+          participants: [...conversation.participants.keys()],
+          sessionState: conversation.sessionState,
+          decisionContext,
+          hasMessages: Boolean(conversation.lastMessage),
+          now,
+          lastMessageAuthorId: conversation.lastMessage?.author,
+          lastMessageTimestamp: conversation.lastMessage?.timestamp,
+          messageCooldownMs: MESSAGE_COOLDOWN,
+          awkwardTimeoutMs: AWKWARD_CONVERSATION_TIMEOUT,
+        });
         if (conversation.isTyping && conversation.isTyping.playerId !== player.id) {
           // Wait for the other player to finish typing.
           return;
         }
         if (!conversation.lastMessage) {
-          const isInitiator = conversation.creator === player.id;
-          const awkwardDeadline = started + AWKWARD_CONVERSATION_TIMEOUT;
-          // Send the first message if we're the initiator or if we've been waiting for too long.
-          if (isInitiator || awkwardDeadline < now) {
+          if (speakingOpportunity.canSpeak) {
             // Grab the lock on the conversation and send a "start" message.
             console.log(`${player.id} initiating conversation with ${otherPlayer.id}.`);
             const messageUuid = crypto.randomUUID();
@@ -184,9 +223,11 @@ export class Agent {
             });
             return;
           } else {
-            // Wait on the other player to say something up to the awkward deadline.
             return;
           }
+        }
+        if (!speakingOpportunity.canSpeak) {
+          return;
         }
         // See if the conversation has been going on too long and decide to leave.
         const tooLongDeadline = started + MAX_CONVERSATION_DURATION;
@@ -203,18 +244,6 @@ export class Agent {
             messageUuid,
             type: 'leave',
           });
-          return;
-        }
-        // Wait for the awkward deadline if we sent the last message.
-        if (conversation.lastMessage.author === player.id) {
-          const awkwardDeadline = conversation.lastMessage.timestamp + AWKWARD_CONVERSATION_TIMEOUT;
-          if (now < awkwardDeadline) {
-            return;
-          }
-        }
-        // Wait for a cooldown after the last message to simulate "reading" the message.
-        const messageCooldown = conversation.lastMessage.timestamp + MESSAGE_COOLDOWN;
-        if (now < messageCooldown) {
           return;
         }
         // Grab the lock and send a message!
@@ -263,6 +292,7 @@ export class Agent {
       toRemember: this.toRemember,
       lastConversation: this.lastConversation,
       lastInviteAttempt: this.lastInviteAttempt,
+      lastInteractionDecision: this.lastInteractionDecision,
       inProgressOperation: this.inProgressOperation,
     };
   }
@@ -274,6 +304,21 @@ export const serializedAgent = {
   toRemember: v.optional(conversationId),
   lastConversation: v.optional(v.number()),
   lastInviteAttempt: v.optional(v.number()),
+  lastInteractionDecision: v.optional(
+    v.object({
+      timestamp: v.number(),
+      shouldInitiate: v.boolean(),
+      selectedPlayerId: v.optional(v.string()),
+      summary: v.string(),
+      reasons: v.array(v.string()),
+      topCandidateScores: v.array(
+        v.object({
+          playerId: v.string(),
+          score: v.number(),
+        }),
+      ),
+    }),
+  ),
   inProgressOperation: v.optional(
     v.object({
       name: v.string(),
@@ -341,7 +386,6 @@ export const findConversationCandidate = internalQuery({
     otherFreePlayers: v.array(v.object(serializedPlayer)),
   },
   handler: async (ctx, { now, worldId, player, otherFreePlayers }) => {
-    const { position } = player;
     const candidates = [];
 
     for (const otherPlayer of otherFreePlayers) {
@@ -358,11 +402,11 @@ export const findConversationCandidate = internalQuery({
           continue;
         }
       }
-      candidates.push({ id: otherPlayer.id, position });
+      candidates.push({ id: otherPlayer.id, position: otherPlayer.position });
     }
 
     // Sort by distance and take the nearest candidate.
-    candidates.sort((a, b) => distance(a.position, position) - distance(b.position, position));
+    candidates.sort((a, b) => distance(a.position, player.position) - distance(b.position, player.position));
     return candidates[0]?.id;
   },
 });

@@ -5,9 +5,9 @@ import { Conversation, conversationInputs } from './conversation';
 import { movePlayer } from './movement';
 import { inputHandler } from './inputHandler';
 import { point } from '../util/types';
-import { Descriptions } from '../../data/characters';
 import { AgentDescription } from './agentDescription';
 import { Agent } from './agent';
+import { defaultSceneAgentDescriptions } from '../../data/scenes';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -40,6 +40,21 @@ export const agentInputs = {
       destination: v.optional(point),
       invitee: v.optional(v.id('players')),
       activity: v.optional(activity),
+      interactionDecision: v.optional(
+        v.object({
+          timestamp: v.number(),
+          shouldInitiate: v.boolean(),
+          selectedPlayerId: v.optional(v.string()),
+          summary: v.string(),
+          reasons: v.array(v.string()),
+          topCandidateScores: v.array(
+            v.object({
+              playerId: v.string(),
+              score: v.number(),
+            }),
+          ),
+        }),
+      ),
     },
     handler: (game, now, args) => {
       const agentId = parseGameId('agents', args.agentId);
@@ -55,6 +70,7 @@ export const agentInputs = {
         return null;
       }
       delete agent.inProgressOperation;
+      agent.lastInteractionDecision = args.interactionDecision;
       const player = game.world.players.get(agent.playerId)!;
       if (args.invitee) {
         const inviteeId = parseGameId('players', args.invitee);
@@ -121,13 +137,13 @@ export const agentInputs = {
       descriptionIndex: v.number(),
     },
     handler: (game, now, args) => {
-      const description = Descriptions[args.descriptionIndex];
+      const description = defaultSceneAgentDescriptions[args.descriptionIndex];
       const playerId = Player.join(
         game,
         now,
         description.name,
         description.character,
-        description.identity,
+        description.publicProfile,
       );
       const agentId = game.allocId('agents');
       game.world.agents.set(
@@ -138,6 +154,7 @@ export const agentInputs = {
           inProgressOperation: undefined,
           lastConversation: undefined,
           lastInviteAttempt: undefined,
+          lastInteractionDecision: undefined,
           toRemember: undefined,
         }),
       );
@@ -145,6 +162,7 @@ export const agentInputs = {
         agentId,
         new AgentDescription({
           agentId: agentId,
+          publicProfile: description.publicProfile,
           identity: description.identity,
           plan: description.plan,
         }),

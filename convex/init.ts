@@ -1,8 +1,8 @@
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { DatabaseReader, MutationCtx, mutation } from './_generated/server';
-import { Descriptions } from '../data/characters';
 import * as map from '../data/gentle';
+import { defaultSceneAgentDescriptions, defaultSceneProtocol } from '../data/scenes';
 import { insertInput } from './aiTown/insertInput';
 import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
@@ -28,10 +28,11 @@ const init = mutation({
       worldStatus.engineId,
     );
     if (shouldCreate) {
-      const toCreate = args.numAgents !== undefined ? args.numAgents : Descriptions.length;
+      const toCreate =
+        args.numAgents !== undefined ? args.numAgents : defaultSceneAgentDescriptions.length;
       for (let i = 0; i < toCreate; i++) {
         await insertInput(ctx, worldStatus.worldId, 'createAgent', {
-          descriptionIndex: i % Descriptions.length,
+          descriptionIndex: i % defaultSceneAgentDescriptions.length,
         });
       }
     }
@@ -58,6 +59,7 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     agents: [],
     conversations: [],
     players: [],
+    sceneState: defaultSceneProtocol.worldSeed,
   });
   const worldStatusId = await ctx.db.insert('worldStatus', {
     engineId: engineId,

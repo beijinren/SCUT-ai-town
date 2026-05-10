@@ -185,7 +185,7 @@ export async function leaveConversationMessage(
 function agentPrompts(
   otherPlayer: { name: string },
   agent: { identity: string; plan: string } | null,
-  otherAgent: { identity: string; plan: string } | null,
+  otherAgent: { publicProfile: string } | null,
 ): string[] {
   const prompt = [];
   if (agent) {
@@ -193,7 +193,7 @@ function agentPrompts(
     prompt.push(`Your goals for the conversation: ${agent.plan}`);
   }
   if (otherAgent) {
-    prompt.push(`About ${otherPlayer.name}: ${otherAgent.identity}`);
+    prompt.push(`About ${otherPlayer.name}: ${otherAgent.publicProfile}`);
   }
   return prompt;
 }
@@ -336,8 +336,7 @@ export const queryPromptData = internalQuery({
       conversation,
       agent: { identity: agentDescription.identity, plan: agentDescription.plan, ...agent },
       otherAgent: otherAgent && {
-        identity: otherAgentDescription!.identity,
-        plan: otherAgentDescription!.plan,
+        publicProfile: otherAgentDescription!.publicProfile,
         ...otherAgent,
       },
       lastConversation,

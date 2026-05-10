@@ -4,13 +4,15 @@ import { conversationId, playerId } from './ids';
 import { Player } from './player';
 import { inputHandler } from './inputHandler';
 
-import { TYPING_TIMEOUT, CONVERSATION_DISTANCE } from '../constants';
-import { distance, normalize, vector } from '../util/geometry';
-import { Point } from '../util/types';
+import { TYPING_TIMEOUT } from '../constants';
 import { Game } from './game';
-import { stopPlayer, blocked, movePlayer } from './movement';
 import { ConversationMembership, serializedConversationMembership } from './conversationMembership';
 import { parseMap, serializeMap } from '../util/object';
+import { defaultConversationRules, orientConversationParticipants } from './defaultConversationRules';
+import {
+  serializedConversationSessionState,
+  SerializedConversationSessionState,
+} from './conversationRules';
 
 export class Conversation {
   id: GameId<'conversations'>;
@@ -25,11 +27,13 @@ export class Conversation {
     author: GameId<'players'>;
     timestamp: number;
   };
+  sessionState: SerializedConversationSessionState;
   numMessages: number;
   participants: Map<GameId<'players'>, ConversationMembership>;
 
   constructor(serialized: SerializedConversation) {
-    const { id, creator, created, isTyping, lastMessage, numMessages, participants } = serialized;
+    const { id, creator, created, isTyping, lastMessage, sessionState, numMessages, participants } =
+      serialized;
     this.id = parseGameId('conversations', id);
     this.creator = parseGameId('players', creator);
     this.created = created;
@@ -42,6 +46,15 @@ export class Conversation {
       author: parseGameId('players', lastMessage.author),
       timestamp: lastMessage.timestamp,
     };
+    this.sessionState = {
+      ...sessionState,
+      currentSpeakerId: sessionState.currentSpeakerId
+        ? parseGameId('players', sessionState.currentSpeakerId)
+        : undefined,
+      nextSpeakerId: sessionState.nextSpeakerId
+        ? parseGameId('players', sessionState.nextSpeakerId)
+        : undefined,
+    };
     this.numMessages = numMessages;
     this.participants = parseMap(participants, ConversationMembership, (m) => m.playerId);
   }
@@ -50,72 +63,30 @@ export class Conversation {
     if (this.isTyping && this.isTyping.since + TYPING_TIMEOUT < now) {
       delete this.isTyping;
     }
-    if (this.participants.size !== 2) {
+    if (this.participants.size !== defaultConversationRules.getParticipantLimit()) {
       console.warn(`Conversation ${this.id} has ${this.participants.size} participants`);
       return;
     }
-    const [playerId1, playerId2] = [...this.participants.keys()];
-    const member1 = this.participants.get(playerId1)!;
-    const member2 = this.participants.get(playerId2)!;
+    const participants = [...this.participants.keys()].map((playerId) => ({
+      player: game.world.players.get(playerId)!,
+      membership: this.participants.get(playerId)!,
+    }));
 
-    const player1 = game.world.players.get(playerId1)!;
-    const player2 = game.world.players.get(playerId2)!;
+    const activation = defaultConversationRules.maybeActivateConversation({
+      game,
+      now,
+      participants,
+      sessionState: this.sessionState,
+    });
+    this.sessionState = activation.sessionState;
 
-    const playerDistance = distance(player1?.position, player2?.position);
-
-    // If the players are both in the "walkingOver" state and they're sufficiently close, transition both
-    // of them to "participating" and stop their paths.
-    if (member1.status.kind === 'walkingOver' && member2.status.kind === 'walkingOver') {
-      if (playerDistance < CONVERSATION_DISTANCE) {
-        console.log(`Starting conversation between ${player1.id} and ${player2.id}`);
-
-        // First, stop the two players from moving.
-        stopPlayer(player1);
-        stopPlayer(player2);
-
-        member1.status = { kind: 'participating', started: now };
-        member2.status = { kind: 'participating', started: now };
-
-        // Try to move the first player to grid point nearest the other player.
-        const neighbors = (p: Point) => [
-          { x: p.x + 1, y: p.y },
-          { x: p.x - 1, y: p.y },
-          { x: p.x, y: p.y + 1 },
-          { x: p.x, y: p.y - 1 },
-        ];
-        const floorPos1 = { x: Math.floor(player1.position.x), y: Math.floor(player1.position.y) };
-        const p1Candidates = neighbors(floorPos1).filter((p) => !blocked(game, now, p, player1.id));
-        p1Candidates.sort((a, b) => distance(a, player2.position) - distance(b, player2.position));
-        if (p1Candidates.length > 0) {
-          const p1Candidate = p1Candidates[0];
-
-          // Try to move the second player to the grid point nearest the first player's
-          // destination.
-          const p2Candidates = neighbors(p1Candidate).filter(
-            (p) => !blocked(game, now, p, player2.id),
-          );
-          p2Candidates.sort(
-            (a, b) => distance(a, player2.position) - distance(b, player2.position),
-          );
-          if (p2Candidates.length > 0) {
-            const p2Candidate = p2Candidates[0];
-            movePlayer(game, now, player1, p1Candidate, true);
-            movePlayer(game, now, player2, p2Candidate, true);
-          }
-        }
-      }
-    }
-
-    // Orient the two players towards each other if they're not moving.
-    if (member1.status.kind === 'participating' && member2.status.kind === 'participating') {
-      const v = normalize(vector(player1.position, player2.position));
-      if (!player1.pathfinding && v) {
-        player1.facing = v;
-      }
-      if (!player2.pathfinding && v) {
-        player2.facing.dx = -v.dx;
-        player2.facing.dy = -v.dy;
-      }
+    if (this.sessionState.stage === 'active') {
+      orientConversationParticipants(
+        participants.map(({ player, membership }) => ({
+          playerId: membership.playerId,
+          player,
+        })),
+      );
     }
   }
 
@@ -136,16 +107,22 @@ export class Conversation {
     }
     const conversationId = game.allocId('conversations');
     console.log(`Creating conversation ${conversationId}`);
+    const startState = defaultConversationRules.buildStartState({
+      creatorId: player.id,
+      inviteeId: invitee.id,
+      now,
+    });
     game.world.conversations.set(
       conversationId,
       new Conversation({
         id: conversationId,
         created: now,
         creator: player.id,
+        sessionState: startState.sessionState,
         numMessages: 0,
         participants: [
-          { playerId: player.id, invited: now, status: { kind: 'walkingOver' } },
-          { playerId: invitee.id, invited: now, status: { kind: 'invited' } },
+          { playerId: player.id, invited: now, status: startState.creatorMembership },
+          { playerId: invitee.id, invited: now, status: startState.inviteeMembership },
         ],
       }),
     );
@@ -211,13 +188,14 @@ export class Conversation {
   }
 
   serialize(): SerializedConversation {
-    const { id, creator, created, isTyping, lastMessage, numMessages } = this;
+    const { id, creator, created, isTyping, lastMessage, sessionState, numMessages } = this;
     return {
       id,
       creator,
       created,
       isTyping,
       lastMessage,
+      sessionState,
       numMessages,
       participants: serializeMap(this.participants),
     };
@@ -241,6 +219,7 @@ export const serializedConversation = {
       timestamp: v.number(),
     }),
   ),
+  sessionState: v.object(serializedConversationSessionState),
   numMessages: v.number(),
   participants: v.array(v.object(serializedConversationMembership)),
 };
@@ -321,6 +300,12 @@ export const conversationInputs = {
       }
       conversation.lastMessage = { author: playerId, timestamp: args.timestamp };
       conversation.numMessages++;
+      conversation.sessionState = defaultConversationRules.onMessageSent({
+        senderId: playerId,
+        participants: [...conversation.participants.keys()],
+        sessionState: conversation.sessionState,
+        timestamp: args.timestamp,
+      }).sessionState;
       return null;
     },
   }),

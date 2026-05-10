@@ -14,6 +14,9 @@ import { ACTIVITIES, ACTIVITY_COOLDOWN, CONVERSATION_COOLDOWN } from '../constan
 import { api, internal } from '../_generated/api';
 import { sleep } from '../util/sleep';
 import { serializedPlayer } from './player';
+import { demoMode } from './demoMode';
+import { serializedSceneWorldSeed } from './world';
+import { decideInteractionTiming } from './interactionTiming';
 
 export const agentRememberConversation = internalAction({
   args: {
@@ -97,6 +100,7 @@ export const agentDoSomething = internalAction({
     agent: v.object(serializedAgent),
     map: v.object(serializedWorldMap),
     otherFreePlayers: v.array(v.object(serializedPlayer)),
+    sceneState: v.optional(v.object(serializedSceneWorldSeed)),
     operationId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -110,49 +114,44 @@ export const agentDoSomething = internalAction({
     const recentlyAttemptedInvite =
       agent.lastInviteAttempt && now < agent.lastInviteAttempt + CONVERSATION_COOLDOWN;
     const recentActivity = player.activity && now < player.activity.until + ACTIVITY_COOLDOWN;
-    // Decide whether to do an activity or wander somewhere.
-    if (!player.pathfinding) {
-      if (recentActivity || justLeftConversation) {
-        await sleep(Math.random() * 1000);
-        await ctx.runMutation(api.aiTown.main.sendInput, {
-          worldId: args.worldId,
-          name: 'finishDoSomething',
-          args: {
-            operationId: args.operationId,
-            agentId: agent.id,
-            destination: wanderDestination(map),
-          },
-        });
-        return;
-      } else {
+    const decision = decideInteractionTiming({
+      player: args.player,
+      otherFreePlayers: args.otherFreePlayers,
+      sceneState: args.sceneState,
+      justLeftConversation: Boolean(justLeftConversation),
+      recentlyAttemptedInvite: Boolean(recentlyAttemptedInvite),
+      doingActivity: Boolean(player.activity && player.activity.until > now),
+    });
+    const interactionDecision = {
+      timestamp: now,
+      shouldInitiate: decision.shouldInitiate,
+      selectedPlayerId: decision.selectedPlayerId,
+      summary: decision.summary,
+      reasons: decision.reasons.map((reason) => reason.message),
+      topCandidateScores: decision.candidateScores
+        .slice(0, 3)
+        .map((candidate) => ({ playerId: candidate.playerId, score: candidate.score })),
+    };
+    const invitee =
+      demoMode.disableAgentConversations || !decision.shouldInitiate
+        ? undefined
+        : decision.selectedPlayerId;
+
+    let destination;
+    let activity;
+    if (!invitee) {
+      if (!player.pathfinding && (recentActivity || justLeftConversation || recentlyAttemptedInvite)) {
+        destination = wanderDestination(map);
+      } else if (!player.pathfinding && !recentActivity) {
         // TODO: have LLM choose the activity & emoji
-        const activity = ACTIVITIES[Math.floor(Math.random() * ACTIVITIES.length)];
-        await sleep(Math.random() * 1000);
-        await ctx.runMutation(api.aiTown.main.sendInput, {
-          worldId: args.worldId,
-          name: 'finishDoSomething',
-          args: {
-            operationId: args.operationId,
-            agentId: agent.id,
-            activity: {
-              description: activity.description,
-              emoji: activity.emoji,
-              until: Date.now() + activity.duration,
-            },
-          },
-        });
-        return;
+        const selectedActivity = ACTIVITIES[Math.floor(Math.random() * ACTIVITIES.length)];
+        activity = {
+          description: selectedActivity.description,
+          emoji: selectedActivity.emoji,
+          until: Date.now() + selectedActivity.duration,
+        };
       }
     }
-    const invitee =
-      justLeftConversation || recentlyAttemptedInvite
-        ? undefined
-        : await ctx.runQuery(internal.aiTown.agent.findConversationCandidate, {
-            now,
-            worldId: args.worldId,
-            player: args.player,
-            otherFreePlayers: args.otherFreePlayers,
-          });
 
     // TODO: We hit a lot of OCC errors on sending inputs in this file. It's
     // easy for them to get scheduled at the same time and line up in time.
@@ -163,7 +162,10 @@ export const agentDoSomething = internalAction({
       args: {
         operationId: args.operationId,
         agentId: args.agent.id,
+        interactionDecision,
         invitee,
+        destination,
+        activity,
       },
     });
   },

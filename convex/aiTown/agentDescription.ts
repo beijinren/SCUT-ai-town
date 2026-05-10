@@ -3,24 +3,27 @@ import { GameId, agentId, parseGameId } from './ids';
 
 export class AgentDescription {
   agentId: GameId<'agents'>;
+  publicProfile: string;
   identity: string;
   plan: string;
 
   constructor(serialized: SerializedAgentDescription) {
-    const { agentId, identity, plan } = serialized;
+    const { agentId, publicProfile, identity, plan } = serialized;
     this.agentId = parseGameId('agents', agentId);
+    this.publicProfile = publicProfile;
     this.identity = identity;
     this.plan = plan;
   }
 
   serialize(): SerializedAgentDescription {
-    const { agentId, identity, plan } = this;
-    return { agentId, identity, plan };
+    const { agentId, publicProfile, identity, plan } = this;
+    return { agentId, publicProfile, identity, plan };
   }
 }
 
 export const serializedAgentDescription = {
   agentId,
+  publicProfile: v.string(),
   identity: v.string(),
   plan: v.string(),
 };
