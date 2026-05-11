@@ -1,6 +1,9 @@
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
+import { ApiConnectionPanel, RoleLocatorEntry } from './ApiConnectionPanel.tsx';
+import { GameId } from '../../convex/aiTown/ids.ts';
+import { DebugToolboxPanel } from './DebugToolboxPanel.tsx';
 
 type FactRecord = {
   id: string;
@@ -62,34 +65,21 @@ type DebugPayload = {
   }>;
 };
 
-function visibilityBadgeClass(visibility: string) {
-  switch (visibility) {
-    case 'public':
-      return 'bg-green-700 text-green-50';
-    case 'private':
-      return 'bg-blue-700 text-blue-50';
-    case 'shared':
-      return 'bg-amber-700 text-amber-50';
-    case 'hidden':
-      return 'bg-rose-700 text-rose-50';
-    default:
-      return 'bg-brown-600 text-brown-50';
-  }
-}
-
-function VisibilityBadge({ visibility }: { visibility: string }) {
-  return (
-    <span
-      className={`inline-block rounded px-2 py-0.5 text-[10px] uppercase tracking-wide ${visibilityBadgeClass(
-        visibility,
-      )}`}
-    >
-      {visibility}
-    </span>
-  );
-}
-
-export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
+export function SceneDebugPanel({
+  worldId,
+  engineId,
+  selectedPlayerId,
+  roleLocatorEntries,
+  conversationByPlayerId,
+  onFocusPlayer,
+}: {
+  worldId: Id<'worlds'>;
+  engineId: Id<'engines'>;
+  selectedPlayerId?: GameId<'players'>;
+  roleLocatorEntries: RoleLocatorEntry[];
+  conversationByPlayerId: Record<string, string | undefined>;
+  onFocusPlayer: (playerId: GameId<'players'>) => void;
+}) {
   const worldApi = api.world as any;
   const debugPayload = useQuery(worldApi.sceneDebugViews, { worldId }) as DebugPayload | undefined;
   const runtimeSceneState = useQuery(worldApi.currentSceneState, { worldId }) as
@@ -112,32 +102,45 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
 
   if (!debugPayload) {
     return (
-      <div className="mt-6 desc">
+      <div className="desc">
         <p className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm">
-          正在加载场景调试视图...
+          正在加载调试数据...
         </p>
       </div>
     );
   }
 
   const { scene, views, runtimeInteractionDecisions } = debugPayload;
+  const shouldInitiateCount = runtimeInteractionDecisions.filter(
+    (item) => item.decision?.shouldInitiate,
+  ).length;
 
   return (
-    <div className="mt-6">
+    <div>
+      <ApiConnectionPanel roleLocatorEntries={roleLocatorEntries} onFocusPlayer={onFocusPlayer} />
+      <DebugToolboxPanel
+        engineId={engineId}
+        selectedPlayerId={selectedPlayerId}
+        roleLocatorEntries={roleLocatorEntries}
+        conversationByPlayerId={conversationByPlayerId}
+      />
+
       <div className="box">
         <h2 className="bg-brown-700 p-2 font-display text-2xl tracking-wider shadow-solid text-center">
-          场景调试面板
+          运行调试面板
         </h2>
       </div>
       <div className="desc mt-4">
         <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-2">
-          <p>场景：{scene.title}</p>
-          <p>类型：{scene.type}</p>
-          <p>地点：{scene.location}</p>
-          <p>阶段：{scene.currentPhase}</p>
-          <p>氛围：{scene.tone}</p>
-          <p>公开摘要：{scene.publicSummary}</p>
-          <p>压力来源：{scene.pressureSource.join('、')}</p>
+          <p className="font-display text-lg">运行快照</p>
+          <p>sceneId：{scene.id}</p>
+          <p>sceneType：{scene.type}</p>
+          <p>currentPhase：{scene.currentPhase}</p>
+          <p>pressureSourceCount：{scene.pressureSource.length}</p>
+          <p>hiddenFactsCount：{scene.hiddenFacts.length}</p>
+          <p>viewCount：{views.length}</p>
+          <p>decisionCount：{runtimeInteractionDecisions.length}</p>
+          <p>initiateCount：{shouldInitiateCount}</p>
         </div>
       </div>
 
@@ -147,86 +150,26 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
             <p className="font-display text-lg">运行时 Scene Seed</p>
             <p>sceneId：{runtimeSceneState.sceneId}</p>
             <p>sceneType：{runtimeSceneState.sceneType}</p>
-            <p>角色名：{runtimeSceneState.roleNames.join('、')}</p>
-            <p>公开事实 ID：{runtimeSceneState.publicFactIds.join('、') || '无'}</p>
-            <p>隐藏事实 ID：{runtimeSceneState.hiddenFactIds.join('、') || '无'}</p>
+            <p>roleCount：{runtimeSceneState.roleIds.length}</p>
+            <p>publicFactCount：{runtimeSceneState.publicFactIds.length}</p>
+            <p>hiddenFactCount：{runtimeSceneState.hiddenFactIds.length}</p>
           </div>
         </div>
       )}
 
       <div className="desc mt-4">
         <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-2">
-          <p className="font-display text-lg">全局隐藏信息</p>
-          <p>这些信息当前不会直接出现在任何角色视图里，只用于说明后续可暴露的事实。</p>
-          <ul className="list-disc pl-5 mt-1 space-y-2">
-            {scene.hiddenFacts.map((fact) => (
-              <li key={fact.id}>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span>{fact.title}</span>
-                  <VisibilityBadge visibility={fact.visibility} />
-                </div>
-                <div className="mt-1">{fact.content}</div>
-                {fact.revealCondition && (
-                  <div className="mt-1 text-brown-200">暴露条件：{fact.revealCondition}</div>
-                )}
+          <p className="font-display text-lg">角色视图统计</p>
+          {views.length === 0 && <p>暂无角色视图。</p>}
+          <ul className="list-disc pl-5 mt-1 space-y-1">
+            {views.map((view) => (
+              <li key={view.role.id}>
+                roleId={view.role.id}, permissionCount={view.availablePermissions.length}, visibleFactCount=
+                {view.visibleFacts.length}, knownFactIdCount={view.role.knownFactIds.length}
               </li>
             ))}
           </ul>
         </div>
-      </div>
-
-      <div className="mt-4 space-y-4">
-        {views.map((view, index) => (
-          <details key={view.role.id} className="desc" open={index === 0}>
-            <summary className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-2 cursor-pointer list-none">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-display text-lg">{view.role.name}</p>
-                  <p className="text-brown-200">{view.role.identity}</p>
-                </div>
-                <div className="text-right text-brown-100">
-                  <p>{view.availablePermissions.length} 个当前权限</p>
-                  <p>{view.visibleFacts.length} 条可见事实</p>
-                </div>
-              </div>
-            </summary>
-            <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm px-4 pb-4 pt-2 space-y-3 border-t border-brown-500">
-              <p>公开目标：{view.role.publicGoal}</p>
-              <p>私下目标：{view.role.privateGoal}</p>
-              <div>
-                <p>当前权限：</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {view.availablePermissions.length > 0 ? (
-                    view.availablePermissions.map((permission) => (
-                      <span
-                        key={permission}
-                        className="inline-block rounded bg-clay-700 px-2 py-1 text-xs uppercase tracking-wide"
-                      >
-                        {permission}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-brown-200">无</span>
-                  )}
-                </div>
-              </div>
-              <div>
-                <p>可见事实：</p>
-                <ul className="list-disc pl-5 mt-2 space-y-2">
-                  {view.visibleFacts.map((fact) => (
-                    <li key={fact.id}>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span>{fact.title}</span>
-                        <VisibilityBadge visibility={fact.visibility} />
-                      </div>
-                      <div className="mt-1">{fact.content}</div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </details>
-        ))}
       </div>
 
       <div className="desc mt-4">
@@ -237,7 +180,7 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
           )}
           {runtimeInteractionDecisions.map((item) => (
             <div key={item.playerId} className="border-t border-brown-500 pt-3 first:border-t-0 first:pt-0">
-              <p className="font-display">{item.playerName}</p>
+              <p className="font-display">playerId：{item.playerId}</p>
               {item.decision ? (
                 <>
                   <p className="text-brown-100 mt-1">

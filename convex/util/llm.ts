@@ -4,7 +4,7 @@ const OPENAI_EMBEDDING_DIMENSION = 1536;
 const TOGETHER_EMBEDDING_DIMENSION = 768;
 const OLLAMA_EMBEDDING_DIMENSION = 1024;
 
-// 当前分支默认使用 OpenAI 的 text-embedding-3-small。
+// 默认使用 OpenAI embeddings。对于本地开发，用户可通过设置 EMBEDDING_PROVIDER=ollama 来切换到 Ollama。
 export const EMBEDDING_DIMENSION: number = OPENAI_EMBEDDING_DIMENSION;
 
 type LLMProvider = 'openai' | 'together' | 'ollama' | 'custom';

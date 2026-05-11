@@ -6,6 +6,7 @@ import { PixiStaticMap } from './PixiStaticMap.tsx';
 import PixiViewport from './PixiViewport.tsx';
 import { Viewport } from 'pixi-viewport';
 import { Id } from '../../convex/_generated/dataModel';
+import { GameId } from '../../convex/aiTown/ids.ts';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api.js';
 import { useSendInput } from '../hooks/sendInput.ts';
@@ -23,6 +24,8 @@ export const PixiGame = (props: {
   width: number;
   height: number;
   setSelectedElement: SelectElement;
+  focusPlayerId?: GameId<'players'>;
+  focusRequestId?: number;
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
@@ -92,6 +95,20 @@ export const PixiGame = (props: {
       scale: 1.5,
     });
   }, [humanPlayerId]);
+
+  useEffect(() => {
+    if (!viewportRef.current || !props.focusPlayerId) {
+      return;
+    }
+    const focusPlayer = props.game.world.players.get(props.focusPlayerId);
+    if (!focusPlayer) {
+      return;
+    }
+    viewportRef.current.animate({
+      position: new PIXI.Point(focusPlayer.position.x * tileDim, focusPlayer.position.y * tileDim),
+      scale: 1.5,
+    });
+  }, [props.focusPlayerId, props.focusRequestId, props.game, tileDim]);
 
   return (
     <PixiViewport

@@ -75,6 +75,12 @@ export default function PlayerDetails({
   const humanStatus =
     humanPlayer && humanConversation && humanConversation.participants.get(humanPlayer.id)?.status;
   const playerStatus = playerConversation && playerConversation.participants.get(playerId)?.status;
+  const conversationPartnerId =
+    playerConversation && [...playerConversation.participants.keys()].find((p) => p !== player.id);
+  const conversationPartner = conversationPartnerId && game.world.players.get(conversationPartnerId);
+  const conversationPartnerDescription = conversationPartnerId
+    ? game.playerDescriptions.get(conversationPartnerId)
+    : undefined;
 
   const haveInvite = sameConversation && humanStatus?.kind === 'invited';
   const waitingForAccept =
@@ -233,6 +239,44 @@ export default function PlayerDetails({
           )}
         </p>
       </div>
+      {playerConversation && (
+        <div className="desc mb-6">
+          <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-2">
+            <p className="font-display text-lg">社交信息</p>
+            <p>conversationId：{playerConversation.id}</p>
+            <p>
+              当前对象：
+              {conversationPartnerDescription?.name ?? conversationPartner?.id ?? '未知'}
+            </p>
+            <p>当前状态：{playerStatus?.kind ?? 'unknown'}</p>
+            {humanPlayer && humanConversation && sameConversation && (
+              <p>你的状态：{humanStatus?.kind ?? 'unknown'}</p>
+            )}
+            <p>
+              参与者：
+              {[...playerConversation.participants.keys()]
+                .map((participantId) => game.playerDescriptions.get(participantId)?.name ?? participantId)
+                .join('、')}
+            </p>
+            <p>
+              正在输入：
+              {playerConversation.isTyping
+                ? `${game.playerDescriptions.get(playerConversation.isTyping.playerId)?.name ??
+                    playerConversation.isTyping.playerId}`
+                : '无'}
+            </p>
+            <p>
+              最近消息：
+              {playerConversation.lastMessage
+                ? `${game.playerDescriptions.get(playerConversation.lastMessage.author)?.name ??
+                    playerConversation.lastMessage.author} @ ${new Date(
+                    playerConversation.lastMessage.timestamp,
+                  ).toLocaleString()}`
+                : '无'}
+            </p>
+          </div>
+        </div>
+      )}
       {!isMe && playerConversation && playerStatus?.kind === 'participating' && (
         <Messages
           worldId={worldId}
