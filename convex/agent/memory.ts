@@ -37,6 +37,7 @@ export type MemorySnapshotEntry = {
       authorId: GameId<'players'>;
       authorName?: string;
       text: string;
+      thought?: string | null;
       createdAt: number;
       messageUuid: string;
     }>;
@@ -147,13 +148,14 @@ export const getWorldMemorySnapshot = query({
               }),
             ),
             messages: messages
-              .map((message) => ({
-                authorId: message.author as GameId<'players'>,
-                authorName: playerNameMap.get(message.author as GameId<'players'>),
-                text: message.text,
-                createdAt: message._creationTime,
-                messageUuid: message.messageUuid,
-              }))
+                .map((message) => ({
+                  authorId: message.author as GameId<'players'>,
+                  authorName: playerNameMap.get(message.author as GameId<'players'>),
+                  text: message.text,
+                  thought: (message as any).thought ?? null,
+                  createdAt: message._creationTime,
+                  messageUuid: message.messageUuid,
+                }))
               .sort((left, right) => left.createdAt - right.createdAt),
           };
         }
@@ -217,7 +219,7 @@ export async function rememberConversation(
     const recipient = message.author === player.id ? otherPlayer : player;
     llmMessages.push({
       role: 'user',
-      content: `${author.name} to ${recipient.name}: ${message.text}`,
+      content: `${author.name} to ${recipient.name}: ${message.text}${(message as any).thought ? ` [internal thought: ${(message as any).thought}]` : ''}`,
     });
   }
   llmMessages.push({ role: 'user', content: 'Summary:' });

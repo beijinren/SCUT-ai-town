@@ -3,11 +3,20 @@ import { v } from 'convex/values';
 import { connectionProfileState } from './agent/connectionProfiles';
 import { agentTables } from './agent/schema';
 import { aiTownTables } from './aiTown/schema';
-import { conversationId, playerId } from './aiTown/ids';
+import { conversationId, playerId, agentId } from './aiTown/ids';
 import { engineTables } from './engine/schema';
 
 export default defineSchema({
   connectionProfileState: defineTable(connectionProfileState),
+
+  agentThoughtState: defineTable({
+    playerId: playerId,
+    agentId: agentId,
+    thoughtLevel: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('agentId', ['agentId'])
+    .index('playerAgentId', ['playerId', 'agentId']),
 
   music: defineTable({
     storageId: v.string(),
@@ -19,6 +28,7 @@ export default defineSchema({
     messageUuid: v.string(),
     author: playerId,
     text: v.string(),
+    thought: v.optional(v.string()),
     worldId: v.optional(v.id('worlds')),
   })
     .index('conversationId', ['worldId', 'conversationId'])

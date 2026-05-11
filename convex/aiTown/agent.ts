@@ -356,6 +356,7 @@ export const agentSendMessage = internalMutation({
     agentId,
     playerId,
     text: v.string(),
+    thought: v.optional(v.string()),
     messageUuid: v.string(),
     leaveConversation: v.boolean(),
     operationId: v.string(),
@@ -365,6 +366,7 @@ export const agentSendMessage = internalMutation({
       conversationId: args.conversationId,
       author: args.playerId,
       text: args.text,
+      thought: args.thought,
       messageUuid: args.messageUuid,
       worldId: args.worldId,
     });

@@ -77,6 +77,13 @@ export function Messages({
             {new Date(m._creationTime).toLocaleString()}
           </time>
         </div>
+        {m.thought && (
+          <div className="bubble bubble-thought">
+            <p className="bg-gray-200 text-gray-600 -mx-3 -my-1 italic text-sm">
+              {m.thought}
+            </p>
+          </div>
+        )}
         <div className={clsx('bubble', m.author === humanPlayerId && 'bubble-mine')}>
           <p className="bg-white -mx-3 -my-1">{m.text}</p>
         </div>

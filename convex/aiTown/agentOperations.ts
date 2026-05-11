@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+﻿import { v } from 'convex/values';
 import { internalAction } from '../_generated/server';
 import { WorldMap, serializedWorldMap } from './worldMap';
 import { rememberConversation } from '../agent/memory';
@@ -17,6 +17,11 @@ import { serializedPlayer } from './player';
 import { demoMode } from './demoMode';
 import { serializedSceneWorldSeed } from './world';
 import { decideInteractionTiming } from './interactionTiming';
+import { generateThought } from '../agent/thoughtGenerator';
+import { getThoughtConfig, THOUGHT_LEVELS } from '../agent/thoughtConfig';
+import { fetchEmbedding } from '../util/llm';
+
+const selfInternal = internal.agent.conversation;
 
 export const agentRememberConversation = internalAction({
   args: {
@@ -72,12 +77,55 @@ export const agentGenerateMessage = internalAction({
       default:
         assertNever(args.type);
     }
+
+    const thoughtLevel = await ctx.runQuery(api.agent.thoughtState.getAgentThoughtLevel, {
+      agentId: args.agentId,
+      playerId: args.playerId,
+    });
+    const promptData = await ctx.runQuery(selfInternal.queryPromptData, {
+      worldId: args.worldId,
+      playerId: args.playerId,
+      otherPlayerId: args.otherPlayerId as GameId<'players'>,
+      conversationId: args.conversationId as GameId<'conversations'>,
+    });
+
+    let thought: string | undefined;
+    if (thoughtLevel !== THOUGHT_LEVELS.INTUITION) {
+      thought = (await generateThought(
+        ctx,
+        args.worldId,
+        args.playerId as GameId<'players'>,
+        args.otherPlayerId as GameId<'players'>,
+        thoughtLevel,
+        promptData.player.name,
+        promptData.otherPlayer.name,
+        promptData.agent.identity,
+      )) ?? undefined;
+      if (thought) {
+        const importance = getThoughtConfig(thoughtLevel).memoryLayers * 10;
+        const { embedding } = await fetchEmbedding(ctx, thought);
+        await ctx.runMutation(internal.agent.memory.insertMemory, {
+          agentId: args.agentId,
+          playerId: args.playerId,
+          description: `Internal thought before responding to ${promptData.otherPlayer.name}: ${thought}`,
+          importance,
+          lastAccess: Date.now(),
+          data: {
+            type: 'reflection',
+            relatedMemoryIds: [],
+          },
+          embedding,
+        });
+      }
+    }
+
     const text = await completionFn(
       ctx,
       args.worldId,
       args.conversationId as GameId<'conversations'>,
       args.playerId as GameId<'players'>,
       args.otherPlayerId as GameId<'players'>,
+      thought,
     );
 
     await ctx.runMutation(internal.aiTown.agent.agentSendMessage, {
@@ -86,6 +134,7 @@ export const agentGenerateMessage = internalAction({
       agentId: args.agentId,
       playerId: args.playerId,
       text,
+      thought,
       messageUuid: args.messageUuid,
       leaveConversation: args.type === 'leave',
       operationId: args.operationId,
@@ -178,3 +227,6 @@ function wanderDestination(worldMap: WorldMap) {
     y: 1 + Math.floor(Math.random() * (worldMap.height - 2)),
   };
 }
+
+
+
