@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "generatedAt": 1778525726488,
+  "worldId": "m1723p51maqdm93p8yekg0x3xs86hd42",
+  "characters": [
+    {
+      "playerId": "p:0",
+      "name": "实习生",
+      "character": "f1",
+      "filePath": "f1-p:0.json",
+      "counts": {
+        "thoughts": 0,
+        "observations": 0,
+        "conversationExperiences": 1
+      }
+    },
+    {
+      "playerId": "p:2",
+      "name": "设计师",
+      "character": "f4",
+      "filePath": "f4-p:2.json",
+      "counts": {
+        "thoughts": 0,
+        "observations": 0,
+        "conversationExperiences": 2
+      }
+    },
+    {
+      "playerId": "p:4",
+      "name": "工程师",
+      "character": "f6",
+      "filePath": "f6-p:4.json",
+      "counts": {
+        "thoughts": 0,
+        "observations": 0,
+        "conversationExperiences": 2
+      }
+    },
+    {
+      "playerId": "p:6",
+      "name": "社区运营",
+      "character": "f3",
+      "filePath": "f3-p:6.json",
+      "counts": {
+        "thoughts": 0,
+        "observations": 0,
+        "conversationExperiences": 1
+      }
+    }
+  ]
+}

@@ -55,7 +55,7 @@ export async function startConversationMessage(
   const lastPrompt = `${player.name} to ${otherPlayer.name}:`;
   prompt.push(lastPrompt);
 
-  const { content } = await chatCompletion({
+  const { content } = await chatCompletion(ctx, {
     messages: [
       {
         role: 'system',
@@ -125,7 +125,7 @@ export async function continueConversationMessage(
   const lastPrompt = `${player.name} to ${otherPlayer.name}:`;
   llmMessages.push({ role: 'user', content: lastPrompt });
 
-  const { content } = await chatCompletion({
+  const { content } = await chatCompletion(ctx, {
     messages: llmMessages,
     max_tokens: 300,
     stop: stopWords(otherPlayer.name, player.name),
@@ -174,7 +174,7 @@ export async function leaveConversationMessage(
   const lastPrompt = `${player.name} to ${otherPlayer.name}:`;
   llmMessages.push({ role: 'user', content: lastPrompt });
 
-  const { content } = await chatCompletion({
+  const { content } = await chatCompletion(ctx, {
     messages: llmMessages,
     max_tokens: 300,
     stop: stopWords(otherPlayer.name, player.name),

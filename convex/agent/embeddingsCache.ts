@@ -26,7 +26,7 @@ export async function fetchBatch(ctx: ActionCtx, texts: string[]) {
   if (cacheResults.length < texts.length) {
     const missingIndexes = [...results.keys()].filter((i) => !results[i]);
     const missingTexts = missingIndexes.map((i) => texts[i]);
-    const response = await fetchEmbeddingBatch(missingTexts);
+    const response = await fetchEmbeddingBatch(ctx, missingTexts);
     if (response.embeddings.length !== missingIndexes.length) {
       throw new Error(
         `Expected ${missingIndexes.length} embeddings, got ${response.embeddings.length}`,

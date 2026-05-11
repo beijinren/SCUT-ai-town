@@ -14,6 +14,7 @@ import { useServerGame } from '../hooks/serverGame.ts';
 import { SceneDebugPanel } from './SceneDebugPanel.tsx';
 import { SceneInfoPanel } from './SceneInfoPanel.tsx';
 import { RoleLocatorEntry } from './ApiConnectionPanel.tsx';
+import { useMemoryAutoSync } from '../hooks/useMemoryAutoSync.ts';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 
@@ -32,6 +33,7 @@ export default function Game() {
   const engineId = worldStatus?.engineId;
 
   const game = useServerGame(worldId);
+  useMemoryAutoSync(worldId);
 
   // Send a periodic heartbeat to our world to keep it alive.
   useWorldHeartbeat();

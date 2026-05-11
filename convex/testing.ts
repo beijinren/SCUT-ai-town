@@ -190,15 +190,15 @@ export const randomPositions = internalMutation({
 
 export const testEmbedding = internalAction({
   args: { input: v.string() },
-  handler: async (_ctx, args) => {
-    return await fetchEmbedding(args.input);
+  handler: async (ctx, args) => {
+    return await fetchEmbedding(ctx, args.input);
   },
 });
 
 export const testCompletion = internalAction({
   args: {},
   handler: async (ctx, args) => {
-    return await chatCompletion({
+    return await chatCompletion(ctx, {
       messages: [
         { content: 'You are helpful', role: 'system' },
         { content: 'Where is pizza?', role: 'user' },

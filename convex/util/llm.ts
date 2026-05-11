@@ -1,3 +1,7 @@
+import { api } from '../_generated/api';
+import { ActionCtx } from '../_generated/server';
+import type { ConnectionProfileState } from '../agent/connectionProfiles';
+
 // That's right! No imports and no dependencies 🤯
 
 const OPENAI_EMBEDDING_DIMENSION = 1536;
@@ -225,7 +229,59 @@ export function getLLMConfig(): LLMConfig {
   };
 }
 
+function normalizeCompatibleBaseUrl(url: string) {
+  return url.trim().replace(/\/$/, '');
+}
+
+function llmConfigFromProfileState(state: ConnectionProfileState): LLMConfig {
+  const activeProfile =
+    state.profiles.find((profile) => profile.name === state.activeProfileName) ?? state.profiles[0];
+  if (!activeProfile) {
+    return getLLMConfig();
+  }
+  const baseUrl = normalizeCompatibleBaseUrl(activeProfile.config.baseUrl);
+  return {
+    chat: {
+      provider: 'custom',
+      url: baseUrl,
+      model: activeProfile.config.chatModel,
+      apiKey: activeProfile.config.apiKey || undefined,
+      stopWords: [],
+    },
+    embedding: {
+      provider: 'custom',
+      url: baseUrl,
+      model: activeProfile.config.embeddingModel,
+      apiKey: activeProfile.config.apiKey || undefined,
+      stopWords: [],
+    },
+  };
+}
+
+async function getRuntimeLLMConfig(ctx?: ActionCtx): Promise<LLMConfig> {
+  if (!ctx) {
+    return getLLMConfig();
+  }
+  try {
+    const state = await ctx.runQuery(api.agent.connectionProfiles.getConnectionState, {});
+    if (state) {
+      return llmConfigFromProfileState(state);
+    }
+  } catch (error) {
+    console.warn('Falling back to env-based LLM config:', error);
+  }
+  return getLLMConfig();
+}
+
 // Overload for non-streaming
+export async function chatCompletion(
+  ctx: ActionCtx,
+  body: Omit<CreateChatCompletionRequest, 'model'> & {
+    model?: CreateChatCompletionRequest['model'];
+  } & {
+    stream?: false | null | undefined;
+  },
+): Promise<{ content: string; retries: number; ms: number }>;
 export async function chatCompletion(
   body: Omit<CreateChatCompletionRequest, 'model'> & {
     model?: CreateChatCompletionRequest['model'];
@@ -235,6 +291,7 @@ export async function chatCompletion(
 ): Promise<{ content: string; retries: number; ms: number }>;
 // Overload for streaming
 export async function chatCompletion(
+  ctx: ActionCtx,
   body: Omit<CreateChatCompletionRequest, 'model'> & {
     model?: CreateChatCompletionRequest['model'];
   } & {
@@ -244,9 +301,25 @@ export async function chatCompletion(
 export async function chatCompletion(
   body: Omit<CreateChatCompletionRequest, 'model'> & {
     model?: CreateChatCompletionRequest['model'];
+  } & {
+    stream?: true;
+  },
+): Promise<{ content: ChatCompletionContent; retries: number; ms: number }>;
+export async function chatCompletion(
+  ctxOrBody:
+    | ActionCtx
+    | (Omit<CreateChatCompletionRequest, 'model'> & {
+        model?: CreateChatCompletionRequest['model'];
+      }),
+  maybeBody?: Omit<CreateChatCompletionRequest, 'model'> & {
+    model?: CreateChatCompletionRequest['model'];
   },
 ) {
-  const config = getLLMConfig().chat;
+  const ctx = maybeBody ? (ctxOrBody as ActionCtx) : undefined;
+  const body = (maybeBody ?? ctxOrBody) as Omit<CreateChatCompletionRequest, 'model'> & {
+    model?: CreateChatCompletionRequest['model'];
+  };
+  const config = (await getRuntimeLLMConfig(ctx)).chat;
   body.model = body.model ?? config.model;
   const stopWords = body.stop ? (typeof body.stop === 'string' ? [body.stop] : body.stop) : [];
   if (config.stopWords) stopWords.push(...config.stopWords);
@@ -311,8 +384,20 @@ export async function tryPullOllama(url: string, model: string, error: string) {
   }
 }
 
-export async function fetchEmbeddingBatch(texts: string[]) {
-  const config = getLLMConfig().embedding;
+export async function fetchEmbeddingBatch(
+  ctx: ActionCtx,
+  texts: string[],
+): Promise<{ ollama: false | true; embeddings: number[][]; usage?: number; retries?: number; ms?: number }>;
+export async function fetchEmbeddingBatch(
+  texts: string[],
+): Promise<{ ollama: false | true; embeddings: number[][]; usage?: number; retries?: number; ms?: number }>;
+export async function fetchEmbeddingBatch(
+  ctxOrTexts: ActionCtx | string[],
+  maybeTexts?: string[],
+) {
+  const ctx = maybeTexts ? (ctxOrTexts as ActionCtx) : undefined;
+  const texts = (maybeTexts ?? ctxOrTexts) as string[];
+  const config = (await getRuntimeLLMConfig(ctx)).embedding;
   if (config.provider === 'ollama') {
     return {
       ollama: true as const,
@@ -361,8 +446,20 @@ export async function fetchEmbeddingBatch(texts: string[]) {
   };
 }
 
-export async function fetchEmbedding(text: string) {
-  const { embeddings, ...stats } = await fetchEmbeddingBatch([text]);
+export async function fetchEmbedding(
+  ctx: ActionCtx,
+  text: string,
+): Promise<{ embedding: number[]; usage?: number; retries?: number; ms?: number }>;
+export async function fetchEmbedding(
+  text: string,
+): Promise<{ embedding: number[]; usage?: number; retries?: number; ms?: number }>;
+export async function fetchEmbedding(
+  ctxOrText: ActionCtx | string,
+  maybeText?: string,
+) {
+  const ctx = maybeText ? (ctxOrText as ActionCtx) : undefined;
+  const text = (maybeText ?? ctxOrText) as string;
+  const { embeddings, ...stats } = await fetchEmbeddingBatch(ctx as ActionCtx, [text]);
   return { embedding: embeddings[0], ...stats };
 }
 

@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 import { GameId } from '../../convex/aiTown/ids.ts';
 
-type ProviderType = 'ollama' | 'openai' | 'together' | 'custom';
-
 type ApiConnectionConfig = {
-  provider: ProviderType;
   baseUrl: string;
   chatModel: string;
   embeddingModel: string;
@@ -20,6 +19,7 @@ type ConnectionProfile = {
 type StoredState = {
   activeProfileName: string;
   profiles: ConnectionProfile[];
+  updatedAt: number;
 };
 
 type TestState = {
@@ -38,6 +38,8 @@ type MessageTestState = {
   response: string;
 };
 
+type StatusKind = TestState['status'] | ModelFetchState['status'] | MessageTestState['status'];
+
 export type RoleLocatorEntry = {
   playerId: GameId<'players'>;
   name: string;
@@ -50,13 +52,12 @@ export type RoleLocatorEntry = {
   social: string;
 };
 
-const STORAGE_KEY = 'aitown.connectionProfiles.v1';
+const STORAGE_KEY = 'aitown.connectionProfiles.v2';
 
 const defaultConfig: ApiConnectionConfig = {
-  provider: 'ollama',
-  baseUrl: 'http://127.0.0.1:11434',
-  chatModel: 'llama3',
-  embeddingModel: 'mxbai-embed-large',
+  baseUrl: 'https://api.openai.com',
+  chatModel: 'gpt-4o-mini',
+  embeddingModel: 'text-embedding-3-small',
   apiKey: '',
 };
 
@@ -64,27 +65,35 @@ function nowText(timestamp: number) {
   return new Date(timestamp).toLocaleString();
 }
 
-function readStoredState(): StoredState {
-  const fallback: StoredState = {
-    activeProfileName: 'Default (Local Ollama)',
+function makeDefaultState(): StoredState {
+  return {
+    activeProfileName: 'Default',
     profiles: [
       {
-        name: 'Default (Local Ollama)',
+        name: 'Default',
         config: defaultConfig,
         updatedAt: Date.now(),
       },
     ],
+    updatedAt: Date.now(),
   };
+}
+
+function readStoredState(): StoredState {
+  const fallback = makeDefaultState();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       return fallback;
     }
     const parsed = JSON.parse(raw) as StoredState;
-    if (!parsed.profiles || parsed.profiles.length === 0) {
+    if (!parsed.profiles?.length) {
       return fallback;
     }
-    return parsed;
+    return {
+      ...parsed,
+      updatedAt: parsed.updatedAt ?? Date.now(),
+    };
   } catch {
     return fallback;
   }
@@ -98,7 +107,7 @@ function normalizeBaseUrl(url: string) {
   return url.trim().replace(/\/$/, '');
 }
 
-function statusClass(status: TestState['status']) {
+function statusClass(status: StatusKind) {
   switch (status) {
     case 'ok':
       return 'bg-green-700 text-green-50';
@@ -111,6 +120,17 @@ function statusClass(status: TestState['status']) {
   }
 }
 
+function createProfileState(name: string, config: ApiConnectionConfig): ConnectionProfile {
+  return {
+    name,
+    config: {
+      ...config,
+      baseUrl: normalizeBaseUrl(config.baseUrl),
+    },
+    updatedAt: Date.now(),
+  };
+}
+
 export function ApiConnectionPanel({
   roleLocatorEntries,
   onFocusPlayer,
@@ -118,10 +138,19 @@ export function ApiConnectionPanel({
   roleLocatorEntries: RoleLocatorEntry[];
   onFocusPlayer: (playerId: GameId<'players'>) => void;
 }) {
+  const backendState = useQuery(api.agent.connectionProfiles.getConnectionState) as
+    | StoredState
+    | null
+    | undefined;
+  const saveConnectionState = useMutation(api.agent.connectionProfiles.saveConnectionState);
 
-  const stored = useMemo(() => readStoredState(), []);
-  const [profiles, setProfiles] = useState<ConnectionProfile[]>(stored.profiles);
-  const [activeProfileName, setActiveProfileName] = useState<string>(stored.activeProfileName);
+  const initialState = useMemo(() => readStoredState(), []);
+  const [profiles, setProfiles] = useState<ConnectionProfile[]>(initialState.profiles);
+  const [activeProfileName, setActiveProfileName] = useState<string>(initialState.activeProfileName);
+  const [workingConfig, setWorkingConfig] = useState<ApiConnectionConfig>(
+    initialState.profiles.find((profile) => profile.name === initialState.activeProfileName)?.config ??
+      initialState.profiles[0].config,
+  );
   const [draftName, setDraftName] = useState('');
   const [showInfo, setShowInfo] = useState(false);
   const [testState, setTestState] = useState<TestState>({ status: 'idle', message: '尚未测试连接。' });
@@ -136,52 +165,61 @@ export function ApiConnectionPanel({
     message: '尚未发送测试消息。',
     response: '',
   });
+  const hydratedFromBackend = useRef(false);
+
+  useEffect(() => {
+    if (!backendState || hydratedFromBackend.current) {
+      return;
+    }
+    hydratedFromBackend.current = true;
+    setProfiles(backendState.profiles);
+    setActiveProfileName(backendState.activeProfileName);
+    const activeProfile =
+      backendState.profiles.find((profile) => profile.name === backendState.activeProfileName) ??
+      backendState.profiles[0];
+    if (activeProfile) {
+      setWorkingConfig(activeProfile.config);
+    }
+    writeStoredState(backendState);
+  }, [backendState]);
 
   const activeProfile =
     profiles.find((profile) => profile.name === activeProfileName) ?? profiles[0] ?? null;
 
-  const [workingConfig, setWorkingConfig] = useState<ApiConnectionConfig>(
-    activeProfile?.config ?? defaultConfig,
-  );
-
   const unsaved =
     !!activeProfile && JSON.stringify(activeProfile.config) !== JSON.stringify(workingConfig);
 
-  function updateWorkingConfig(updater: (prev: ApiConnectionConfig) => ApiConnectionConfig) {
-    setWorkingConfig((prev) => {
-      const next = updater(prev);
-      const normalized = {
-        ...next,
-        baseUrl: normalizeBaseUrl(next.baseUrl),
-      };
-      setProfiles((prevProfiles) => {
-        const nextProfiles = prevProfiles.map((profile) =>
-          profile.name === activeProfileName
-            ? {
-                ...profile,
-                config: normalized,
-                updatedAt: Date.now(),
-              }
-            : profile,
-        );
-        writeStoredState({
-          profiles: nextProfiles,
-          activeProfileName,
-        });
-        return nextProfiles;
-      });
-      return normalized;
-    });
-  }
-
-  function persist(nextProfiles: ConnectionProfile[], nextActiveName: string) {
-    const next: StoredState = {
+  function persistState(nextProfiles: ConnectionProfile[], nextActiveName: string) {
+    const nextState: StoredState = {
       profiles: nextProfiles,
       activeProfileName: nextActiveName,
+      updatedAt: Date.now(),
     };
-    writeStoredState(next);
     setProfiles(nextProfiles);
     setActiveProfileName(nextActiveName);
+    writeStoredState(nextState);
+    void saveConnectionState(nextState);
+  }
+
+  function updateWorkingConfig(updater: (prev: ApiConnectionConfig) => ApiConnectionConfig) {
+    setWorkingConfig((prev) => {
+      const updated = updater(prev);
+      const next = {
+        ...updated,
+        baseUrl: normalizeBaseUrl(updated.baseUrl),
+      };
+      const nextProfiles = profiles.map((profile) =>
+        profile.name === activeProfileName
+          ? {
+              ...profile,
+              config: next,
+              updatedAt: Date.now(),
+            }
+          : profile,
+      );
+      persistState(nextProfiles, activeProfileName);
+      return next;
+    });
   }
 
   function switchProfile(name: string) {
@@ -191,8 +229,11 @@ export function ApiConnectionPanel({
     }
     setActiveProfileName(name);
     setWorkingConfig(target.config);
-    setTestState({ status: 'idle', message: '已切换配置档案，等待测试连接。' });
-    writeStoredState({ profiles, activeProfileName: name });
+    persistState(
+      profiles.map((profile) => ({ ...profile })),
+      name,
+    );
+    setTestState({ status: 'idle', message: '已热切换到新的 API 档案。' });
   }
 
   function createProfile() {
@@ -205,13 +246,8 @@ export function ApiConnectionPanel({
       setTestState({ status: 'error', message: '配置档案名称重复，请使用唯一名称。' });
       return;
     }
-    const nextProfile: ConnectionProfile = {
-      name,
-      config: { ...workingConfig, baseUrl: normalizeBaseUrl(workingConfig.baseUrl) },
-      updatedAt: Date.now(),
-    };
-    const nextProfiles = [...profiles, nextProfile];
-    persist(nextProfiles, name);
+    const nextProfiles = [...profiles, createProfileState(name, workingConfig)];
+    persistState(nextProfiles, name);
     setDraftName('');
     setTestState({ status: 'ok', message: '已创建新的配置档案。' });
   }
@@ -224,12 +260,15 @@ export function ApiConnectionPanel({
       profile.name === activeProfile.name
         ? {
             ...profile,
-            config: { ...workingConfig, baseUrl: normalizeBaseUrl(workingConfig.baseUrl) },
+            config: {
+              ...workingConfig,
+              baseUrl: normalizeBaseUrl(workingConfig.baseUrl),
+            },
             updatedAt: Date.now(),
           }
         : profile,
     );
-    persist(nextProfiles, activeProfile.name);
+    persistState(nextProfiles, activeProfile.name);
     setTestState({ status: 'ok', message: '已更新当前配置档案。' });
   }
 
@@ -251,7 +290,7 @@ export function ApiConnectionPanel({
     }
     const nextProfiles = profiles.filter((profile) => profile.name !== activeProfile.name);
     const nextActiveName = nextProfiles[0].name;
-    persist(nextProfiles, nextActiveName);
+    persistState(nextProfiles, nextActiveName);
     setWorkingConfig(nextProfiles[0].config);
     setTestState({ status: 'ok', message: '已删除当前配置档案。' });
   }
@@ -265,15 +304,6 @@ export function ApiConnectionPanel({
     setTestState({ status: 'testing', message: '正在测试连接...' });
 
     try {
-      if (workingConfig.provider === 'ollama') {
-        const response = await fetch(`${base}/api/tags`);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        setTestState({ status: 'ok', message: 'Ollama 连接成功。' });
-        return;
-      }
-
       const headers: Record<string, string> = {};
       if (workingConfig.apiKey.trim()) {
         headers.Authorization = `Bearer ${workingConfig.apiKey.trim()}`;
@@ -282,7 +312,7 @@ export function ApiConnectionPanel({
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      setTestState({ status: 'ok', message: '接口连接成功。' });
+      setTestState({ status: 'ok', message: 'OpenAI-compatible 接口连接成功。' });
     } catch (error) {
       const detail = error instanceof Error ? error.message : '未知错误';
       setTestState({ status: 'error', message: `连接失败：${detail}` });
@@ -299,25 +329,6 @@ export function ApiConnectionPanel({
     setModelFetchState({ status: 'loading', message: '正在拉取模型列表...' });
 
     try {
-      if (workingConfig.provider === 'ollama') {
-        const response = await fetch(`${base}/api/tags`);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const data = (await response.json()) as { models?: Array<{ name?: string; model?: string }> };
-        const modelNames = (data.models ?? [])
-          .map((item) => item.name ?? item.model ?? '')
-          .filter((name) => !!name);
-
-        if (modelNames.length === 0) {
-          throw new Error('没有返回可用模型');
-        }
-
-        setAvailableModels(modelNames);
-        setModelFetchState({ status: 'ok', message: `已拉取 ${modelNames.length} 个模型。` });
-        return;
-      }
-
       const headers: Record<string, string> = {};
       if (workingConfig.apiKey.trim()) {
         headers.Authorization = `Bearer ${workingConfig.apiKey.trim()}`;
@@ -368,31 +379,6 @@ export function ApiConnectionPanel({
     });
 
     try {
-      if (workingConfig.provider === 'ollama') {
-        const response = await fetch(`${base}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: workingConfig.chatModel,
-            messages: [{ role: 'user', content: testPrompt }],
-            stream: false,
-          }),
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const data = (await response.json()) as {
-          message?: { content?: string };
-        };
-        const text = data.message?.content ?? '收到响应，但内容为空。';
-        setMessageTestState({
-          status: 'ok',
-          message: '测试消息发送成功。',
-          response: text,
-        });
-        return;
-      }
-
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
@@ -441,7 +427,8 @@ export function ApiConnectionPanel({
 
       <div className="desc mt-4">
         <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-3">
-          <p className="font-display text-lg">连接配置档案</p>
+          <p className="font-display text-lg">OpenAI-compatible 档案</p>
+          <p className="text-brown-200">切换档案会立即作用于测试请求与后端运行时配置。</p>
 
           <label className="block">
             <span>当前档案</span>
@@ -469,25 +456,6 @@ export function ApiConnectionPanel({
               创建
             </button>
           </div>
-
-          <label className="block">
-            <span>Provider</span>
-            <select
-              className="mt-1 w-full rounded bg-brown-900 px-2 py-1 text-brown-100"
-              value={workingConfig.provider}
-              onChange={(event) =>
-                updateWorkingConfig((prev) => ({
-                  ...prev,
-                  provider: event.target.value as ProviderType,
-                }))
-              }
-            >
-              <option value="ollama">ollama</option>
-              <option value="openai">openai</option>
-              <option value="together">together</option>
-              <option value="custom">custom</option>
-            </select>
-          </label>
 
           <label className="block">
             <span>Base URL</span>
@@ -597,7 +565,9 @@ export function ApiConnectionPanel({
           <p>{testState.message}</p>
 
           <div className="flex items-center justify-between gap-3">
-            <span className={`inline-block rounded px-2 py-0.5 text-xs ${statusClass(modelFetchState.status)}`}>
+            <span
+              className={`inline-block rounded px-2 py-0.5 text-xs ${statusClass(modelFetchState.status)}`}
+            >
               {modelFetchState.status.toUpperCase()}
             </span>
             <span className="text-brown-200">模型数：{availableModels.length}</span>
@@ -614,7 +584,9 @@ export function ApiConnectionPanel({
           </label>
 
           <div className="flex items-center justify-between gap-3">
-            <span className={`inline-block rounded px-2 py-0.5 text-xs ${statusClass(messageTestState.status)}`}>
+            <span
+              className={`inline-block rounded px-2 py-0.5 text-xs ${statusClass(messageTestState.status)}`}
+            >
               {messageTestState.status.toUpperCase()}
             </span>
             <span className="text-brown-200">消息可用性检测</span>
@@ -630,7 +602,7 @@ export function ApiConnectionPanel({
             <div className="rounded border border-brown-500 p-2">
               <p>档案名：{activeProfile.name}</p>
               <p>最后更新时间：{nowText(activeProfile.updatedAt)}</p>
-              <p>当前设计：档案保存到浏览器本地，便于快速切换连接配置。</p>
+              <p>当前设计：档案会同时保存到浏览器本地与 Convex，切换后立刻生效。</p>
             </div>
           )}
         </div>
@@ -648,7 +620,9 @@ export function ApiConnectionPanel({
           {roleLocatorEntries.map((role) => (
             <details key={role.playerId} className="rounded border border-brown-500 p-2">
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
-                <span>{role.name} ({role.playerId})</span>
+                <span>
+                  {role.name} ({role.playerId})
+                </span>
                 <button
                   type="button"
                   className="rounded bg-clay-700 px-2 py-1 text-xs"
@@ -662,7 +636,9 @@ export function ApiConnectionPanel({
               </summary>
               <div className="mt-2 space-y-1 text-brown-100">
                 <p>character：{role.character}</p>
-                <p>position：({role.position.x}, {role.position.y})</p>
+                <p>
+                  position：({role.position.x}, {role.position.y})
+                </p>
                 <p>facing：{role.facing}</p>
                 <p>activity：{role.activity}</p>
                 <p>social：{role.social}</p>
