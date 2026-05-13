@@ -1,12 +1,18 @@
-import { v } from 'convex/values';
-import { ActionCtx, DatabaseReader, internalMutation, internalQuery } from '../_generated/server';
-import { Doc, Id } from '../_generated/dataModel';
-import { internal } from '../_generated/api';
-import { LLMMessage, chatCompletion, fetchEmbedding } from '../util/llm';
-import { asyncMap } from '../util/asyncMap';
-import { GameId, agentId, conversationId, playerId } from '../aiTown/ids';
-import { SerializedPlayer } from '../aiTown/player';
-import { memoryFields } from './schema';
+import { v } from "convex/values";
+import {
+  ActionCtx,
+  DatabaseReader,
+  internalMutation,
+  internalQuery,
+  query,
+} from "../_generated/server";
+import { Doc, Id } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
+import { LLMMessage, chatCompletion, fetchEmbedding } from "../util/llm";
+import { asyncMap } from "../util/asyncMap";
+import { GameId, agentId, conversationId, playerId } from "../aiTown/ids";
+import { SerializedPlayer } from "../aiTown/player";
+import { memoryFields } from "./schema";
 
 // How long to wait before updating a memory's last access time.
 export const MEMORY_ACCESS_THROTTLE = 300_000; // In ms
@@ -15,18 +21,199 @@ export const MEMORY_ACCESS_THROTTLE = 300_000; // In ms
 const MEMORY_OVERFETCH = 10;
 const selfInternal = internal.agent.memory;
 
-export type Memory = Doc<'memories'>;
-export type MemoryType = Memory['data']['type'];
-export type MemoryOfType<T extends MemoryType> = Omit<Memory, 'data'> & {
-  data: Extract<Memory['data'], { type: T }>;
+export type Memory = Doc<"memories">;
+export type MemoryType = Memory["data"]["type"];
+export type MemoryOfType<T extends MemoryType> = Omit<Memory, "data"> & {
+  data: Extract<Memory["data"], { type: T }>;
 };
+
+export type MemorySnapshotEntry = {
+  _id: Memory["_id"];
+  _creationTime: number;
+  description: string;
+  importance: number;
+  lastAccess: number;
+  data: Memory["data"];
+  conversationLog?: {
+    conversationId: GameId<"conversations">;
+    created?: number;
+    ended?: number;
+    participants: Array<{ playerId: GameId<"players">; name?: string }>;
+    messages: Array<{
+      authorId: GameId<"players">;
+      authorName?: string;
+      text: string;
+      thought?: string | null;
+      createdAt: number;
+      messageUuid: string;
+    }>;
+  };
+};
+
+export type WorldMemorySnapshot = {
+  worldId: Id<"worlds">;
+  updatedAt: number;
+  characters: Array<{
+    playerId: GameId<"players">;
+    name: string;
+    character: string;
+    identity: string;
+    plan: string;
+    publicProfile?: string;
+    memories: {
+      relationship: MemorySnapshotEntry[];
+      conversation: MemorySnapshotEntry[];
+      reflection: MemorySnapshotEntry[];
+    };
+  }>;
+};
+
+export const getWorldMemorySnapshot = query({
+  args: {
+    worldId: v.id("worlds"),
+  },
+  handler: async (ctx, args): Promise<WorldMemorySnapshot> => {
+    const world = await ctx.db.get(args.worldId);
+    if (!world) {
+      throw new Error(`World ${args.worldId} not found`);
+    }
+
+    const playerNameMap = new Map<GameId<"players">, string>();
+    await asyncMap(world.players, async (player) => {
+      const playerDescription = await ctx.db
+        .query("playerDescriptions")
+        .withIndex("worldId", (q) =>
+          q.eq("worldId", args.worldId).eq("playerId", player.id),
+        )
+        .first();
+      if (playerDescription) {
+        playerNameMap.set(
+          player.id as GameId<"players">,
+          playerDescription.name,
+        );
+      }
+    });
+
+    const characters = await asyncMap(world.players, async (player) => {
+      const playerDescription = await ctx.db
+        .query("playerDescriptions")
+        .withIndex("worldId", (q) =>
+          q.eq("worldId", args.worldId).eq("playerId", player.id),
+        )
+        .first();
+      if (!playerDescription) {
+        throw new Error(`Player description for ${player.id} not found`);
+      }
+
+      const agent = world.agents.find(
+        (candidate) => candidate.playerId === player.id,
+      );
+      const agentDescription = agent
+        ? await ctx.db
+            .query("agentDescriptions")
+            .withIndex("worldId", (q) =>
+              q.eq("worldId", args.worldId).eq("agentId", agent.id),
+            )
+            .first()
+        : null;
+
+      const memories = await ctx.db
+        .query("memories")
+        .withIndex("playerId", (q) => q.eq("playerId", player.id))
+        .collect();
+
+      const grouped = {
+        relationship: [] as MemorySnapshotEntry[],
+        conversation: [] as MemorySnapshotEntry[],
+        reflection: [] as MemorySnapshotEntry[],
+      };
+
+      for (const memory of memories) {
+        const entry: MemorySnapshotEntry = {
+          _id: memory._id,
+          _creationTime: memory._creationTime,
+          description: memory.description,
+          importance: memory.importance,
+          lastAccess: memory.lastAccess,
+          data: memory.data,
+        };
+
+        const memoryData = memory.data;
+        if (memoryData.type === "conversation") {
+          const convoId = memoryData.conversationId as GameId<"conversations">;
+          const archivedConversation = await ctx.db
+            .query("archivedConversations")
+            .withIndex("worldId", (q) =>
+              q.eq("worldId", args.worldId).eq("id", convoId),
+            )
+            .first();
+          const messages = await ctx.db
+            .query("messages")
+            .withIndex("conversationId", (q) =>
+              q.eq("worldId", args.worldId).eq("conversationId", convoId),
+            )
+            .collect();
+
+          entry.conversationLog = {
+            conversationId: convoId,
+            created: archivedConversation?.created,
+            ended: archivedConversation?.ended,
+            participants: (
+              archivedConversation?.participants ?? [
+                player.id,
+                ...memoryData.playerIds,
+              ]
+            ).map((participantId) => ({
+              playerId: participantId as GameId<"players">,
+              name: playerNameMap.get(participantId as GameId<"players">),
+            })),
+            messages: messages
+              .map((message) => ({
+                authorId: message.author as GameId<"players">,
+                authorName: playerNameMap.get(
+                  message.author as GameId<"players">,
+                ),
+                text: message.text,
+                thought: (message as any).thought ?? null,
+                createdAt: message._creationTime,
+                messageUuid: message.messageUuid,
+              }))
+              .sort((left, right) => left.createdAt - right.createdAt),
+          };
+        }
+
+        grouped[memory.data.type].push(entry);
+      }
+
+      for (const entries of Object.values(grouped)) {
+        entries.sort((left, right) => right.lastAccess - left.lastAccess);
+      }
+
+      return {
+        playerId: player.id as GameId<"players">,
+        name: playerDescription.name,
+        character: playerDescription.character,
+        identity: agentDescription?.identity ?? "",
+        plan: agentDescription?.plan ?? "",
+        publicProfile: agentDescription?.publicProfile,
+        memories: grouped,
+      };
+    });
+
+    return {
+      worldId: args.worldId,
+      updatedAt: Date.now(),
+      characters,
+    };
+  },
+});
 
 export async function rememberConversation(
   ctx: ActionCtx,
-  worldId: Id<'worlds'>,
-  agentId: GameId<'agents'>,
-  playerId: GameId<'players'>,
-  conversationId: GameId<'conversations'>,
+  worldId: Id<"worlds">,
+  agentId: GameId<"agents">,
+  playerId: GameId<"players">,
+  conversationId: GameId<"conversations">,
 ) {
   const data = await ctx.runQuery(selfInternal.loadConversation, {
     worldId,
@@ -34,40 +221,43 @@ export async function rememberConversation(
     conversationId,
   });
   const { player, otherPlayer } = data;
-  const messages = await ctx.runQuery(selfInternal.loadMessages, { worldId, conversationId });
+  const messages = await ctx.runQuery(selfInternal.loadMessages, {
+    worldId,
+    conversationId,
+  });
   if (!messages.length) {
     return;
   }
 
   const llmMessages: LLMMessage[] = [
     {
-      role: 'user',
+      role: "user",
       content: `You are ${player.name}, and you just finished a conversation with ${otherPlayer.name}. I would
       like you to summarize the conversation from ${player.name}'s perspective, using first-person pronouns like
       "I," and add if you liked or disliked this interaction.`,
     },
   ];
-  const authors = new Set<GameId<'players'>>();
+  const authors = new Set<GameId<"players">>();
   for (const message of messages) {
     const author = message.author === player.id ? player : otherPlayer;
-    authors.add(author.id as GameId<'players'>);
+    authors.add(author.id as GameId<"players">);
     const recipient = message.author === player.id ? otherPlayer : player;
     llmMessages.push({
-      role: 'user',
-      content: `${author.name} to ${recipient.name}: ${message.text}`,
+      role: "user",
+      content: `${author.name} to ${recipient.name}: ${message.text}${(message as any).thought ? ` [internal thought: ${(message as any).thought}]` : ""}`,
     });
   }
-  llmMessages.push({ role: 'user', content: 'Summary:' });
-  const { content } = await chatCompletion({
+  llmMessages.push({ role: "user", content: "Summary:" });
+  const { content } = await chatCompletion(ctx, {
     messages: llmMessages,
     max_tokens: 500,
   });
   const description = `Conversation with ${otherPlayer.name} at ${new Date(
     data.conversation._creationTime,
   ).toLocaleString()}: ${content}`;
-  const importance = await calculateImportance(description);
-  const { embedding } = await fetchEmbedding(description);
-  authors.delete(player.id as GameId<'players'>);
+  const importance = await calculateImportance(ctx, description);
+  const { embedding } = await fetchEmbedding(ctx, description);
+  authors.delete(player.id as GameId<"players">);
   await ctx.runMutation(selfInternal.insertMemory, {
     agentId,
     playerId: player.id,
@@ -75,7 +265,7 @@ export async function rememberConversation(
     importance,
     lastAccess: messages[messages.length - 1]._creationTime,
     data: {
-      type: 'conversation',
+      type: "conversation",
       conversationId,
       playerIds: [...authors],
     },
@@ -87,7 +277,7 @@ export async function rememberConversation(
 
 export const loadConversation = internalQuery({
   args: {
-    worldId: v.id('worlds'),
+    worldId: v.id("worlds"),
     playerId,
     conversationId,
   },
@@ -101,26 +291,30 @@ export const loadConversation = internalQuery({
       throw new Error(`Player ${args.playerId} not found`);
     }
     const playerDescription = await ctx.db
-      .query('playerDescriptions')
-      .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
+      .query("playerDescriptions")
+      .withIndex("worldId", (q) =>
+        q.eq("worldId", args.worldId).eq("playerId", args.playerId),
+      )
       .first();
     if (!playerDescription) {
       throw new Error(`Player description for ${args.playerId} not found`);
     }
     const conversation = await ctx.db
-      .query('archivedConversations')
-      .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('id', args.conversationId))
+      .query("archivedConversations")
+      .withIndex("worldId", (q) =>
+        q.eq("worldId", args.worldId).eq("id", args.conversationId),
+      )
       .first();
     if (!conversation) {
       throw new Error(`Conversation ${args.conversationId} not found`);
     }
     const otherParticipator = await ctx.db
-      .query('participatedTogether')
-      .withIndex('conversation', (q) =>
+      .query("participatedTogether")
+      .withIndex("conversation", (q) =>
         q
-          .eq('worldId', args.worldId)
-          .eq('player1', args.playerId)
-          .eq('conversationId', args.conversationId),
+          .eq("worldId", args.worldId)
+          .eq("player1", args.playerId)
+          .eq("conversationId", args.conversationId),
       )
       .first();
     if (!otherParticipator) {
@@ -129,20 +323,26 @@ export const loadConversation = internalQuery({
       );
     }
     const otherPlayerId = otherParticipator.player2;
-    let otherPlayer: SerializedPlayer | Doc<'archivedPlayers'> | null =
+    let otherPlayer: SerializedPlayer | Doc<"archivedPlayers"> | null =
       world.players.find((p) => p.id === otherPlayerId) ?? null;
     if (!otherPlayer) {
       otherPlayer = await ctx.db
-        .query('archivedPlayers')
-        .withIndex('worldId', (q) => q.eq('worldId', world._id).eq('id', otherPlayerId))
+        .query("archivedPlayers")
+        .withIndex("worldId", (q) =>
+          q.eq("worldId", world._id).eq("id", otherPlayerId),
+        )
         .first();
     }
     if (!otherPlayer) {
-      throw new Error(`Conversation ${args.conversationId} other player not found`);
+      throw new Error(
+        `Conversation ${args.conversationId} other player not found`,
+      );
     }
     const otherPlayerDescription = await ctx.db
-      .query('playerDescriptions')
-      .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', otherPlayerId))
+      .query("playerDescriptions")
+      .withIndex("worldId", (q) =>
+        q.eq("worldId", args.worldId).eq("playerId", otherPlayerId),
+      )
       .first();
     if (!otherPlayerDescription) {
       throw new Error(`Player description for ${otherPlayerId} not found`);
@@ -157,19 +357,22 @@ export const loadConversation = internalQuery({
 
 export async function searchMemories(
   ctx: ActionCtx,
-  playerId: GameId<'players'>,
+  playerId: GameId<"players">,
   searchEmbedding: number[],
   n: number = 3,
 ) {
-  const candidates = await ctx.vectorSearch('memoryEmbeddings', 'embedding', {
+  const candidates = await ctx.vectorSearch("memoryEmbeddings", "embedding", {
     vector: searchEmbedding,
-    filter: (q) => q.eq('playerId', playerId),
+    filter: (q) => q.eq("playerId", playerId),
     limit: n * MEMORY_OVERFETCH,
   });
-  const rankedMemories = await ctx.runMutation(selfInternal.rankAndTouchMemories, {
-    candidates,
-    n,
-  });
+  const rankedMemories = await ctx.runMutation(
+    selfInternal.rankAndTouchMemories,
+    {
+      candidates,
+      n,
+    },
+  );
   return rankedMemories.map(({ memory }) => memory);
 }
 
@@ -186,15 +389,17 @@ function normalize(value: number, range: readonly [number, number]) {
 
 export const rankAndTouchMemories = internalMutation({
   args: {
-    candidates: v.array(v.object({ _id: v.id('memoryEmbeddings'), _score: v.number() })),
+    candidates: v.array(
+      v.object({ _id: v.id("memoryEmbeddings"), _score: v.number() }),
+    ),
     n: v.number(),
   },
   handler: async (ctx, args) => {
     const ts = Date.now();
     const relatedMemories = await asyncMap(args.candidates, async ({ _id }) => {
       const memory = await ctx.db
-        .query('memories')
-        .withIndex('embeddingId', (q) => q.eq('embeddingId', _id))
+        .query("memories")
+        .withIndex("embeddingId", (q) => q.eq("embeddingId", _id))
         .first();
       if (!memory) throw new Error(`Memory for embedding ${_id} not found`);
       return memory;
@@ -229,25 +434,25 @@ export const rankAndTouchMemories = internalMutation({
 
 export const loadMessages = internalQuery({
   args: {
-    worldId: v.id('worlds'),
+    worldId: v.id("worlds"),
     conversationId,
   },
-  handler: async (ctx, args): Promise<Doc<'messages'>[]> => {
+  handler: async (ctx, args): Promise<Doc<"messages">[]> => {
     const messages = await ctx.db
-      .query('messages')
-      .withIndex('conversationId', (q) =>
-        q.eq('worldId', args.worldId).eq('conversationId', args.conversationId),
+      .query("messages")
+      .withIndex("conversationId", (q) =>
+        q.eq("worldId", args.worldId).eq("conversationId", args.conversationId),
       )
       .collect();
     return messages;
   },
 });
 
-async function calculateImportance(description: string) {
-  const { content: importanceRaw } = await chatCompletion({
+async function calculateImportance(ctx: ActionCtx, description: string) {
+  const { content: importanceRaw } = await chatCompletion(ctx, {
     messages: [
       {
-        role: 'user',
+        role: "user",
         content: `On the scale of 0 to 9, where 0 is purely mundane (e.g., brushing teeth, making bed) and 9 is extremely poignant (e.g., a break up, college acceptance), rate the likely poignancy of the following piece of memory.
       Memory: ${description}
       Answer on a scale of 0 to 9. Respond with number only, e.g. "5"`,
@@ -262,13 +467,14 @@ async function calculateImportance(description: string) {
     importance = +(importanceRaw.match(/\d+/)?.[0] ?? NaN);
   }
   if (isNaN(importance)) {
-    console.debug('Could not parse memory importance from: ', importanceRaw);
+    console.debug("Could not parse memory importance from: ", importanceRaw);
     importance = 5;
   }
   return importance;
 }
 
-const { embeddingId: _embeddingId, ...memoryFieldsWithoutEmbeddingId } = memoryFields;
+const { embeddingId: _embeddingId, ...memoryFieldsWithoutEmbeddingId } =
+  memoryFields;
 
 export const insertMemory = internalMutation({
   args: {
@@ -277,11 +483,11 @@ export const insertMemory = internalMutation({
     ...memoryFieldsWithoutEmbeddingId,
   },
   handler: async (ctx, { agentId: _, embedding, ...memory }): Promise<void> => {
-    const embeddingId = await ctx.db.insert('memoryEmbeddings', {
+    const embeddingId = await ctx.db.insert("memoryEmbeddings", {
       playerId: memory.playerId,
       embedding,
     });
-    await ctx.db.insert('memories', {
+    await ctx.db.insert("memories", {
       ...memory,
       embeddingId,
     });
@@ -290,12 +496,12 @@ export const insertMemory = internalMutation({
 
 export const insertReflectionMemories = internalMutation({
   args: {
-    worldId: v.id('worlds'),
+    worldId: v.id("worlds"),
     playerId,
     reflections: v.array(
       v.object({
         description: v.string(),
-        relatedMemoryIds: v.array(v.id('memories')),
+        relatedMemoryIds: v.array(v.id("memories")),
         importance: v.number(),
         embedding: v.array(v.float64()),
       }),
@@ -304,17 +510,17 @@ export const insertReflectionMemories = internalMutation({
   handler: async (ctx, { playerId, reflections }) => {
     const lastAccess = Date.now();
     for (const { embedding, relatedMemoryIds, ...rest } of reflections) {
-      const embeddingId = await ctx.db.insert('memoryEmbeddings', {
+      const embeddingId = await ctx.db.insert("memoryEmbeddings", {
         playerId,
         embedding,
       });
-      await ctx.db.insert('memories', {
+      await ctx.db.insert("memories", {
         playerId,
         embeddingId,
         lastAccess,
         ...rest,
         data: {
-          type: 'reflection',
+          type: "reflection",
           relatedMemoryIds,
         },
       });
@@ -324,8 +530,8 @@ export const insertReflectionMemories = internalMutation({
 
 async function reflectOnMemories(
   ctx: ActionCtx,
-  worldId: Id<'worlds'>,
-  playerId: GameId<'players'>,
+  worldId: Id<"worlds">,
+  playerId: GameId<"players">,
 ) {
   const { memories, lastReflectionTs, name } = await ctx.runQuery(
     internal.agent.memory.getReflectionMemories,
@@ -345,13 +551,19 @@ async function reflectOnMemories(
   if (!shouldReflect) {
     return false;
   }
-  console.debug('sum of importance score = ', sumOfImportanceScore);
-  console.debug('Reflecting...');
-  const prompt = ['[no prose]', '[Output only JSON]', `You are ${name}, statements about you:`];
+  console.debug("sum of importance score = ", sumOfImportanceScore);
+  console.debug("Reflecting...");
+  const prompt = [
+    "[no prose]",
+    "[Output only JSON]",
+    `You are ${name}, statements about you:`,
+  ];
   memories.forEach((m, idx) => {
     prompt.push(`Statement ${idx}: ${m.description}`);
   });
-  prompt.push('What 3 high-level insights can you infer from the above statements?');
+  prompt.push(
+    "What 3 high-level insights can you infer from the above statements?",
+  );
   prompt.push(
     'Return in JSON format, where the key is a list of input statements that contributed to your insights and value is your insight. Make the response parseable by Typescript JSON.parse() function. DO NOT escape characters or include "\n" or white space in response.',
   );
@@ -359,22 +571,27 @@ async function reflectOnMemories(
     'Example: [{insight: "...", statementIds: [1,2]}, {insight: "...", statementIds: [1]}, ...]',
   );
 
-  const { content: reflection } = await chatCompletion({
+  const { content: reflection } = await chatCompletion(ctx, {
     messages: [
       {
-        role: 'user',
-        content: prompt.join('\n'),
+        role: "user",
+        content: prompt.join("\n"),
       },
     ],
   });
 
   try {
-    const insights = JSON.parse(reflection) as { insight: string; statementIds: number[] }[];
+    const insights = JSON.parse(reflection) as {
+      insight: string;
+      statementIds: number[];
+    }[];
     const memoriesToSave = await asyncMap(insights, async (item) => {
-      const relatedMemoryIds = item.statementIds.map((idx: number) => memories[idx]._id);
-      const importance = await calculateImportance(item.insight);
-      const { embedding } = await fetchEmbedding(item.insight);
-      console.debug('adding reflection memory...', item.insight);
+      const relatedMemoryIds = item.statementIds.map(
+        (idx: number) => memories[idx]._id,
+      );
+      const importance = await calculateImportance(ctx, item.insight);
+      const { embedding } = await fetchEmbedding(ctx, item.insight);
+      console.debug("adding reflection memory...", item.insight);
       return {
         description: item.insight,
         embedding,
@@ -389,14 +606,14 @@ async function reflectOnMemories(
       reflections: memoriesToSave,
     });
   } catch (e) {
-    console.error('error saving or parsing reflection', e);
-    console.debug('reflection', reflection);
+    console.error("error saving or parsing reflection", e);
+    console.debug("reflection", reflection);
     return false;
   }
   return true;
 }
 export const getReflectionMemories = internalQuery({
-  args: { worldId: v.id('worlds'), playerId, numberOfItems: v.number() },
+  args: { worldId: v.id("worlds"), playerId, numberOfItems: v.number() },
   handler: async (ctx, args) => {
     const world = await ctx.db.get(args.worldId);
     if (!world) {
@@ -407,24 +624,26 @@ export const getReflectionMemories = internalQuery({
       throw new Error(`Player ${args.playerId} not found`);
     }
     const playerDescription = await ctx.db
-      .query('playerDescriptions')
-      .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
+      .query("playerDescriptions")
+      .withIndex("worldId", (q) =>
+        q.eq("worldId", args.worldId).eq("playerId", args.playerId),
+      )
       .first();
     if (!playerDescription) {
       throw new Error(`Player description for ${args.playerId} not found`);
     }
     const memories = await ctx.db
-      .query('memories')
-      .withIndex('playerId', (q) => q.eq('playerId', player.id))
-      .order('desc')
+      .query("memories")
+      .withIndex("playerId", (q) => q.eq("playerId", player.id))
+      .order("desc")
       .take(args.numberOfItems);
 
     const lastReflection = await ctx.db
-      .query('memories')
-      .withIndex('playerId_type', (q) =>
-        q.eq('playerId', args.playerId).eq('data.type', 'reflection'),
+      .query("memories")
+      .withIndex("playerId_type", (q) =>
+        q.eq("playerId", args.playerId).eq("data.type", "reflection"),
       )
-      .order('desc')
+      .order("desc")
       .first();
 
     return {
@@ -437,13 +656,15 @@ export const getReflectionMemories = internalQuery({
 
 export async function latestMemoryOfType<T extends MemoryType>(
   db: DatabaseReader,
-  playerId: GameId<'players'>,
+  playerId: GameId<"players">,
   type: T,
 ) {
   const entry = await db
-    .query('memories')
-    .withIndex('playerId_type', (q) => q.eq('playerId', playerId).eq('data.type', type))
-    .order('desc')
+    .query("memories")
+    .withIndex("playerId_type", (q) =>
+      q.eq("playerId", playerId).eq("data.type", type),
+    )
+    .order("desc")
     .first();
   if (!entry) return null;
   return entry as MemoryOfType<T>;

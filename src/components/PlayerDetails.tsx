@@ -1,14 +1,14 @@
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
-import closeImg from '../../assets/close.svg';
-import { SelectElement } from './Player';
-import { Messages } from './Messages';
-import { toastOnError } from '../toasts';
-import { useSendInput } from '../hooks/sendInput';
-import { Player } from '../../convex/aiTown/player';
-import { GameId } from '../../convex/aiTown/ids';
-import { ServerGame } from '../hooks/serverGame';
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Id } from "../../convex/_generated/dataModel";
+import closeImg from "../../assets/close.svg";
+import { SelectElement } from "./Player";
+import { Messages } from "./Messages";
+import { toastOnError } from "../toasts";
+import { useSendInput } from "../hooks/sendInput";
+import { Player } from "../../convex/aiTown/player";
+import { GameId } from "../../convex/aiTown/ids";
+import { ServerGame } from "../hooks/serverGame";
 
 export default function PlayerDetails({
   worldId,
@@ -18,10 +18,10 @@ export default function PlayerDetails({
   setSelectedElement,
   scrollViewRef,
 }: {
-  worldId: Id<'worlds'>;
-  engineId: Id<'engines'>;
+  worldId: Id<"worlds">;
+  engineId: Id<"engines">;
   game: ServerGame;
-  playerId?: GameId<'players'>;
+  playerId?: GameId<"players">;
   setSelectedElement: SelectElement;
   scrollViewRef: React.RefObject<HTMLDivElement>;
 }) {
@@ -29,7 +29,9 @@ export default function PlayerDetails({
 
   const players = [...game.world.players.values()];
   const humanPlayer = players.find((p) => p.human === humanTokenIdentifier);
-  const humanConversation = humanPlayer ? game.world.playerConversation(humanPlayer) : undefined;
+  const humanConversation = humanPlayer
+    ? game.world.playerConversation(humanPlayer)
+    : undefined;
   // 如果当前没有明确选中对象，再默认指向当前会话里的另一个参与者。
   if (!playerId && humanPlayer && humanConversation) {
     const otherPlayerIds = [...humanConversation.participants.keys()].filter(
@@ -43,15 +45,15 @@ export default function PlayerDetails({
 
   const previousConversation = useQuery(
     api.world.previousConversation,
-    playerId ? { worldId, playerId } : 'skip',
+    playerId ? { worldId, playerId } : "skip",
   );
 
   const playerDescription = playerId && game.playerDescriptions.get(playerId);
 
-  const startConversation = useSendInput(engineId, 'startConversation');
-  const acceptInvite = useSendInput(engineId, 'acceptInvite');
-  const rejectInvite = useSendInput(engineId, 'rejectInvite');
-  const leaveConversation = useSendInput(engineId, 'leaveConversation');
+  const startConversation = useSendInput(engineId, "startConversation");
+  const acceptInvite = useSendInput(engineId, "acceptInvite");
+  const rejectInvite = useSendInput(engineId, "rejectInvite");
+  const leaveConversation = useSendInput(engineId, "leaveConversation");
 
   if (!playerId) {
     return (
@@ -73,26 +75,42 @@ export default function PlayerDetails({
     humanConversation.id === playerConversation.id;
 
   const humanStatus =
-    humanPlayer && humanConversation && humanConversation.participants.get(humanPlayer.id)?.status;
-  const playerStatus = playerConversation && playerConversation.participants.get(playerId)?.status;
+    humanPlayer &&
+    humanConversation &&
+    humanConversation.participants.get(humanPlayer.id)?.status;
+  const playerStatus =
+    playerConversation && playerConversation.participants.get(playerId)?.status;
+  const conversationPartnerId =
+    playerConversation &&
+    [...playerConversation.participants.keys()].find((p) => p !== player.id);
+  const conversationPartner =
+    conversationPartnerId && game.world.players.get(conversationPartnerId);
+  const conversationPartnerDescription = conversationPartnerId
+    ? game.playerDescriptions.get(conversationPartnerId)
+    : undefined;
 
-  const haveInvite = sameConversation && humanStatus?.kind === 'invited';
+  const haveInvite = sameConversation && humanStatus?.kind === "invited";
   const waitingForAccept =
-    sameConversation && playerConversation.participants.get(playerId)?.status.kind === 'invited';
+    sameConversation &&
+    playerConversation.participants.get(playerId)?.status.kind === "invited";
   const waitingForNearby =
-    sameConversation && playerStatus?.kind === 'walkingOver' && humanStatus?.kind === 'walkingOver';
+    sameConversation &&
+    playerStatus?.kind === "walkingOver" &&
+    humanStatus?.kind === "walkingOver";
 
   const inConversationWithMe =
     sameConversation &&
-    playerStatus?.kind === 'participating' &&
-    humanStatus?.kind === 'participating';
+    playerStatus?.kind === "participating" &&
+    humanStatus?.kind === "participating";
 
   const onStartConversation = async () => {
     if (!humanPlayer || !playerId) {
       return;
     }
     console.log(`Starting conversation`);
-    await toastOnError(startConversation({ playerId: humanPlayer.id, invitee: playerId }));
+    await toastOnError(
+      startConversation({ playerId: humanPlayer.id, invitee: playerId }),
+    );
   };
   const onAcceptInvite = async () => {
     if (!humanPlayer || !humanConversation || !playerId) {
@@ -130,7 +148,7 @@ export default function PlayerDetails({
   // const pendingSuffix = (inputName: string) =>
   //   [...inflightInputs.values()].find((i) => i.name === inputName) ? ' opacity-50' : '';
 
-  const pendingSuffix = (s: string) => '';
+  const pendingSuffix = (s: string) => "";
   return (
     <>
       <div className="flex gap-4">
@@ -151,13 +169,17 @@ export default function PlayerDetails({
       {canInvite && (
         <a
           className={
-            'mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto' +
-            pendingSuffix('startConversation')
+            "mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto" +
+            pendingSuffix("startConversation")
           }
           onClick={onStartConversation}
         >
           <div className="h-full bg-clay-700 text-center">
-            <span>{humanConversation ? 'Invite into conversation' : 'Start conversation'}</span>
+            <span>
+              {humanConversation
+                ? "Invite into conversation"
+                : "Start conversation"}
+            </span>
           </div>
         </a>
       )}
@@ -178,8 +200,8 @@ export default function PlayerDetails({
       {inConversationWithMe && (
         <a
           className={
-            'mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto' +
-            pendingSuffix('leaveConversation')
+            "mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto" +
+            pendingSuffix("leaveConversation")
           }
           onClick={onLeaveConversation}
         >
@@ -192,8 +214,8 @@ export default function PlayerDetails({
         <>
           <a
             className={
-              'mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto' +
-              pendingSuffix('acceptInvite')
+              "mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto" +
+              pendingSuffix("acceptInvite")
             }
             onClick={onAcceptInvite}
           >
@@ -203,8 +225,8 @@ export default function PlayerDetails({
           </a>
           <a
             className={
-              'mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto' +
-              pendingSuffix('rejectInvite')
+              "mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto" +
+              pendingSuffix("rejectInvite")
             }
             onClick={onRejectInvite}
           >
@@ -214,13 +236,15 @@ export default function PlayerDetails({
           </a>
         </>
       )}
-      {!playerConversation && player.activity && player.activity.until > Date.now() && (
-        <div className="box flex-grow mt-6">
-          <h2 className="bg-brown-700 text-base sm:text-lg text-center">
-            {player.activity.description}
-          </h2>
-        </div>
-      )}
+      {!playerConversation &&
+        player.activity &&
+        player.activity.until > Date.now() && (
+          <div className="box flex-grow mt-6">
+            <h2 className="bg-brown-700 text-base sm:text-lg text-center">
+              {player.activity.description}
+            </h2>
+          </div>
+        )}
       <div className="desc my-6">
         <p className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm">
           {!isMe && playerDescription?.description}
@@ -233,26 +257,80 @@ export default function PlayerDetails({
           )}
         </p>
       </div>
-      {!isMe && playerConversation && playerStatus?.kind === 'participating' && (
-        <Messages
-          worldId={worldId}
-          engineId={engineId}
-          inConversationWithMe={inConversationWithMe ?? false}
-          conversation={{ kind: 'active', doc: playerConversation }}
-          humanPlayer={humanPlayer}
-          scrollViewRef={scrollViewRef}
-        />
+      {playerConversation && (
+        <div className="desc mb-6">
+          <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-2">
+            <p className="font-display text-lg">社交信息</p>
+            <p>conversationId：{playerConversation.id}</p>
+            <p>
+              当前对象：
+              {conversationPartnerDescription?.name ??
+                conversationPartner?.id ??
+                "未知"}
+            </p>
+            <p>当前状态：{playerStatus?.kind ?? "unknown"}</p>
+            {humanPlayer && humanConversation && sameConversation && (
+              <p>你的状态：{humanStatus?.kind ?? "unknown"}</p>
+            )}
+            <p>
+              参与者：
+              {[...playerConversation.participants.keys()]
+                .map(
+                  (participantId) =>
+                    game.playerDescriptions.get(participantId)?.name ??
+                    participantId,
+                )
+                .join("、")}
+            </p>
+            <p>
+              正在输入：
+              {playerConversation.isTyping
+                ? `${
+                    game.playerDescriptions.get(
+                      playerConversation.isTyping.playerId,
+                    )?.name ?? playerConversation.isTyping.playerId
+                  }`
+                : "无"}
+            </p>
+            <p>
+              最近消息：
+              {playerConversation.lastMessage
+                ? `${
+                    game.playerDescriptions.get(
+                      playerConversation.lastMessage.author,
+                    )?.name ?? playerConversation.lastMessage.author
+                  } @ ${new Date(
+                    playerConversation.lastMessage.timestamp,
+                  ).toLocaleString()}`
+                : "无"}
+            </p>
+          </div>
+        </div>
       )}
+      {!isMe &&
+        playerConversation &&
+        playerStatus?.kind === "participating" && (
+          <Messages
+            worldId={worldId}
+            engineId={engineId}
+            inConversationWithMe={inConversationWithMe ?? false}
+            conversation={{ kind: "active", doc: playerConversation }}
+            humanPlayer={humanPlayer}
+            scrollViewRef={scrollViewRef}
+          />
+        )}
       {!playerConversation && previousConversation && (
         <>
           <div className="box flex-grow">
-            <h2 className="bg-brown-700 text-lg text-center">Previous conversation</h2>
+            <h2 className="bg-brown-700 text-lg text-center">
+              Previous conversation
+            </h2>
           </div>
           <Messages
             worldId={worldId}
             engineId={engineId}
             inConversationWithMe={false}
-            conversation={{ kind: 'archived', doc: previousConversation }}
+            conversation={{ kind: "archived", doc: previousConversation }}
             humanPlayer={humanPlayer}
             scrollViewRef={scrollViewRef}
           />

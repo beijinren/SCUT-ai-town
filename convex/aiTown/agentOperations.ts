@@ -1,26 +1,38 @@
-import { v } from 'convex/values';
-import { internalAction } from '../_generated/server';
-import { WorldMap, serializedWorldMap } from './worldMap';
-import { rememberConversation } from '../agent/memory';
-import { GameId, agentId, conversationId, playerId } from './ids';
+import { v } from "convex/values";
+import { internalAction } from "../_generated/server";
+import { WorldMap, serializedWorldMap } from "./worldMap";
+import { rememberConversation } from "../agent/memory";
+import { GameId, agentId, conversationId, playerId } from "./ids";
 import {
   continueConversationMessage,
   leaveConversationMessage,
   startConversationMessage,
-} from '../agent/conversation';
-import { assertNever } from '../util/assertNever';
-import { serializedAgent } from './agent';
-import { ACTIVITIES, ACTIVITY_COOLDOWN, CONVERSATION_COOLDOWN } from '../constants';
-import { api, internal } from '../_generated/api';
-import { sleep } from '../util/sleep';
-import { serializedPlayer } from './player';
-import { demoMode } from './demoMode';
-import { serializedSceneWorldSeed } from './world';
-import { decideInteractionTiming, InteractionTargetCandidate } from './interactionTiming';
+} from "../agent/conversation";
+import { assertNever } from "../util/assertNever";
+import { serializedAgent } from "./agent";
+import {
+  ACTIVITIES,
+  ACTIVITY_COOLDOWN,
+  CONVERSATION_COOLDOWN,
+} from "../constants";
+import { api, internal } from "../_generated/api";
+import { sleep } from "../util/sleep";
+import { serializedPlayer } from "./player";
+import { demoMode } from "./demoMode";
+import { serializedSceneWorldSeed } from "./world";
+import {
+  decideInteractionTiming,
+  InteractionTargetCandidate,
+} from "./interactionTiming";
+import { generateThought } from "../agent/thoughtGenerator";
+import { getThoughtConfig, THOUGHT_LEVELS } from "../agent/thoughtConfig";
+import { fetchEmbedding } from "../util/llm";
+
+const selfInternal = internal.agent.conversation;
 
 export const agentRememberConversation = internalAction({
   args: {
-    worldId: v.id('worlds'),
+    worldId: v.id("worlds"),
     playerId,
     agentId,
     conversationId,
@@ -30,14 +42,14 @@ export const agentRememberConversation = internalAction({
     await rememberConversation(
       ctx,
       args.worldId,
-      args.agentId as GameId<'agents'>,
-      args.playerId as GameId<'players'>,
-      args.conversationId as GameId<'conversations'>,
+      args.agentId as GameId<"agents">,
+      args.playerId as GameId<"players">,
+      args.conversationId as GameId<"conversations">,
     );
     await sleep(Math.random() * 1000);
     await ctx.runMutation(api.aiTown.main.sendInput, {
       worldId: args.worldId,
-      name: 'finishRememberConversation',
+      name: "finishRememberConversation",
       args: {
         agentId: args.agentId,
         operationId: args.operationId,
@@ -48,36 +60,87 @@ export const agentRememberConversation = internalAction({
 
 export const agentGenerateMessage = internalAction({
   args: {
-    worldId: v.id('worlds'),
+    worldId: v.id("worlds"),
     playerId,
     agentId,
     conversationId,
     otherPlayerId: playerId,
     operationId: v.string(),
-    type: v.union(v.literal('start'), v.literal('continue'), v.literal('leave')),
+    type: v.union(
+      v.literal("start"),
+      v.literal("continue"),
+      v.literal("leave"),
+    ),
     messageUuid: v.string(),
   },
   handler: async (ctx, args) => {
     let completionFn;
     switch (args.type) {
-      case 'start':
+      case "start":
         completionFn = startConversationMessage;
         break;
-      case 'continue':
+      case "continue":
         completionFn = continueConversationMessage;
         break;
-      case 'leave':
+      case "leave":
         completionFn = leaveConversationMessage;
         break;
       default:
         assertNever(args.type);
     }
+
+    const thoughtLevel = await ctx.runQuery(
+      api.agent.thoughtState.getAgentThoughtLevel,
+      {
+        agentId: args.agentId,
+        playerId: args.playerId,
+      },
+    );
+    const promptData = await ctx.runQuery(selfInternal.queryPromptData, {
+      worldId: args.worldId,
+      playerId: args.playerId,
+      otherPlayerId: args.otherPlayerId as GameId<"players">,
+      conversationId: args.conversationId as GameId<"conversations">,
+    });
+
+    let thought: string | undefined;
+    if (thoughtLevel !== THOUGHT_LEVELS.INTUITION) {
+      thought =
+        (await generateThought(
+          ctx,
+          args.worldId,
+          args.playerId as GameId<"players">,
+          args.otherPlayerId as GameId<"players">,
+          thoughtLevel,
+          promptData.player.name,
+          promptData.otherPlayer.name,
+          promptData.agent.identity,
+        )) ?? undefined;
+      if (thought) {
+        const importance = getThoughtConfig(thoughtLevel).memoryLayers * 10;
+        const { embedding } = await fetchEmbedding(ctx, thought);
+        await ctx.runMutation(internal.agent.memory.insertMemory, {
+          agentId: args.agentId,
+          playerId: args.playerId,
+          description: `Internal thought before responding to ${promptData.otherPlayer.name}: ${thought}`,
+          importance,
+          lastAccess: Date.now(),
+          data: {
+            type: "reflection",
+            relatedMemoryIds: [],
+          },
+          embedding,
+        });
+      }
+    }
+
     const text = await completionFn(
       ctx,
       args.worldId,
-      args.conversationId as GameId<'conversations'>,
-      args.playerId as GameId<'players'>,
-      args.otherPlayerId as GameId<'players'>,
+      args.conversationId as GameId<"conversations">,
+      args.playerId as GameId<"players">,
+      args.otherPlayerId as GameId<"players">,
+      thought,
     );
 
     await ctx.runMutation(internal.aiTown.agent.agentSendMessage, {
@@ -86,8 +149,9 @@ export const agentGenerateMessage = internalAction({
       agentId: args.agentId,
       playerId: args.playerId,
       text,
+      thought,
       messageUuid: args.messageUuid,
-      leaveConversation: args.type === 'leave',
+      leaveConversation: args.type === "leave",
       operationId: args.operationId,
     });
   },
@@ -95,7 +159,7 @@ export const agentGenerateMessage = internalAction({
 
 export const agentDoSomething = internalAction({
   args: {
-    worldId: v.id('worlds'),
+    worldId: v.id("worlds"),
     player: v.object(serializedPlayer),
     agent: v.object(serializedAgent),
     map: v.object(serializedWorldMap),
@@ -103,7 +167,10 @@ export const agentDoSomething = internalAction({
     joinableConversationTargets: v.array(
       v.object({
         player: v.object(serializedPlayer),
-        source: v.union(v.literal('free_player'), v.literal('active_conversation')),
+        source: v.union(
+          v.literal("free_player"),
+          v.literal("active_conversation"),
+        ),
         conversationId: v.optional(v.string()),
         participantCount: v.optional(v.number()),
       }),
@@ -117,15 +184,18 @@ export const agentDoSomething = internalAction({
     const now = Date.now();
     // Don't try to start a new conversation if we were just in one.
     const justLeftConversation =
-      agent.lastConversation && now < agent.lastConversation + CONVERSATION_COOLDOWN;
+      agent.lastConversation &&
+      now < agent.lastConversation + CONVERSATION_COOLDOWN;
     // Don't try again if we recently tried to find someone to invite.
     const recentlyAttemptedInvite =
-      agent.lastInviteAttempt && now < agent.lastInviteAttempt + CONVERSATION_COOLDOWN;
-    const recentActivity = player.activity && now < player.activity.until + ACTIVITY_COOLDOWN;
+      agent.lastInviteAttempt &&
+      now < agent.lastInviteAttempt + CONVERSATION_COOLDOWN;
+    const recentActivity =
+      player.activity && now < player.activity.until + ACTIVITY_COOLDOWN;
     const interactionCandidates: InteractionTargetCandidate[] = [
       ...args.otherFreePlayers.map((otherPlayer) => ({
         player: otherPlayer,
-        source: 'free_player' as const,
+        source: "free_player" as const,
       })),
       ...args.joinableConversationTargets,
     ];
@@ -145,7 +215,10 @@ export const agentDoSomething = internalAction({
       reasons: decision.reasons.map((reason) => reason.message),
       topCandidateScores: decision.candidateScores
         .slice(0, 3)
-        .map((candidate) => ({ playerId: candidate.playerId, score: candidate.score })),
+        .map((candidate) => ({
+          playerId: candidate.playerId,
+          score: candidate.score,
+        })),
     };
     const invitee =
       demoMode.disableAgentConversations || !decision.shouldInitiate
@@ -155,11 +228,15 @@ export const agentDoSomething = internalAction({
     let destination;
     let activity;
     if (!invitee) {
-      if (!player.pathfinding && (recentActivity || justLeftConversation || recentlyAttemptedInvite)) {
+      if (
+        !player.pathfinding &&
+        (recentActivity || justLeftConversation || recentlyAttemptedInvite)
+      ) {
         destination = wanderDestination(map);
       } else if (!player.pathfinding && !recentActivity) {
         // TODO: have LLM choose the activity & emoji
-        const selectedActivity = ACTIVITIES[Math.floor(Math.random() * ACTIVITIES.length)];
+        const selectedActivity =
+          ACTIVITIES[Math.floor(Math.random() * ACTIVITIES.length)];
         activity = {
           description: selectedActivity.description,
           emoji: selectedActivity.emoji,
@@ -173,7 +250,7 @@ export const agentDoSomething = internalAction({
     await sleep(Math.random() * 1000);
     await ctx.runMutation(api.aiTown.main.sendInput, {
       worldId: args.worldId,
-      name: 'finishDoSomething',
+      name: "finishDoSomething",
       args: {
         operationId: args.operationId,
         agentId: args.agent.id,

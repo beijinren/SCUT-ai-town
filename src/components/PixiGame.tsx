@@ -1,39 +1,43 @@
-import * as PIXI from 'pixi.js';
-import { useApp } from '@pixi/react';
-import { Player, SelectElement } from './Player.tsx';
-import { useEffect, useRef, useState } from 'react';
-import { PixiStaticMap } from './PixiStaticMap.tsx';
-import PixiViewport from './PixiViewport.tsx';
-import { Viewport } from 'pixi-viewport';
-import { Id } from '../../convex/_generated/dataModel';
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api.js';
-import { useSendInput } from '../hooks/sendInput.ts';
-import { toastOnError } from '../toasts.ts';
-import { DebugPath } from './DebugPath.tsx';
-import { PositionIndicator } from './PositionIndicator.tsx';
-import { SHOW_DEBUG_UI } from './Game.tsx';
-import { ServerGame } from '../hooks/serverGame.ts';
+import * as PIXI from "pixi.js";
+import { useApp } from "@pixi/react";
+import { Player, SelectElement } from "./Player.tsx";
+import { useEffect, useRef, useState } from "react";
+import { PixiStaticMap } from "./PixiStaticMap.tsx";
+import PixiViewport from "./PixiViewport.tsx";
+import { Viewport } from "pixi-viewport";
+import { Id } from "../../convex/_generated/dataModel";
+import { GameId } from "../../convex/aiTown/ids.ts";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api.js";
+import { useSendInput } from "../hooks/sendInput.ts";
+import { toastOnError } from "../toasts.ts";
+import { DebugPath } from "./DebugPath.tsx";
+import { PositionIndicator } from "./PositionIndicator.tsx";
+import { SHOW_DEBUG_UI } from "./Game.tsx";
+import { ServerGame } from "../hooks/serverGame.ts";
 
 export const PixiGame = (props: {
-  worldId: Id<'worlds'>;
-  engineId: Id<'engines'>;
+  worldId: Id<"worlds">;
+  engineId: Id<"engines">;
   game: ServerGame;
   historicalTime: number | undefined;
   width: number;
   height: number;
   setSelectedElement: SelectElement;
+  focusPlayerId?: GameId<"players">;
+  focusRequestId?: number;
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
   const viewportRef = useRef<Viewport | undefined>();
 
-  const humanTokenIdentifier = useQuery(api.world.userStatus, { worldId: props.worldId }) ?? null;
+  const humanTokenIdentifier =
+    useQuery(api.world.userStatus, { worldId: props.worldId }) ?? null;
   const humanPlayerId = [...props.game.world.players.values()].find(
     (p) => p.human === humanTokenIdentifier,
   )?.id;
 
-  const moveTo = useSendInput(props.engineId, 'moveTo');
+  const moveTo = useSendInput(props.engineId, "moveTo");
 
   // Interaction for clicking on the world to navigate.
   const dragStart = useRef<{ screenX: number; screenY: number } | null>(null);
@@ -77,7 +81,9 @@ export const PixiGame = (props: {
       y: Math.floor(gameSpaceTiles.y),
     };
     console.log(`Moving to ${JSON.stringify(roundedTiles)}`);
-    await toastOnError(moveTo({ playerId: humanPlayerId, destination: roundedTiles }));
+    await toastOnError(
+      moveTo({ playerId: humanPlayerId, destination: roundedTiles }),
+    );
   };
   const { width, height, tileDim } = props.game.worldMap;
   const players = [...props.game.world.players.values()];
@@ -88,10 +94,30 @@ export const PixiGame = (props: {
 
     const humanPlayer = props.game.world.players.get(humanPlayerId)!;
     viewportRef.current.animate({
-      position: new PIXI.Point(humanPlayer.position.x * tileDim, humanPlayer.position.y * tileDim),
+      position: new PIXI.Point(
+        humanPlayer.position.x * tileDim,
+        humanPlayer.position.y * tileDim,
+      ),
       scale: 1.5,
     });
   }, [humanPlayerId]);
+
+  useEffect(() => {
+    if (!viewportRef.current || !props.focusPlayerId) {
+      return;
+    }
+    const focusPlayer = props.game.world.players.get(props.focusPlayerId);
+    if (!focusPlayer) {
+      return;
+    }
+    viewportRef.current.animate({
+      position: new PIXI.Point(
+        focusPlayer.position.x * tileDim,
+        focusPlayer.position.y * tileDim,
+      ),
+      scale: 1.5,
+    });
+  }, [props.focusPlayerId, props.focusRequestId, props.game, tileDim]);
 
   return (
     <PixiViewport
@@ -114,7 +140,9 @@ export const PixiGame = (props: {
             <DebugPath key={`path-${p.id}`} player={p} tileDim={tileDim} />
           ),
       )}
-      {lastDestination && <PositionIndicator destination={lastDestination} tileDim={tileDim} />}
+      {lastDestination && (
+        <PositionIndicator destination={lastDestination} tileDim={tileDim} />
+      )}
       {players.map((p) => (
         <Player
           key={`player-${p.id}`}

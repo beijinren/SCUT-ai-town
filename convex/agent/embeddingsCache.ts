@@ -1,8 +1,12 @@
-import { v } from 'convex/values';
-import { ActionCtx, internalMutation, internalQuery } from '../_generated/server';
-import { internal } from '../_generated/api';
-import { Id } from '../_generated/dataModel';
-import { fetchEmbeddingBatch } from '../util/llm';
+import { v } from "convex/values";
+import {
+  ActionCtx,
+  internalMutation,
+  internalQuery,
+} from "../_generated/server";
+import { internal } from "../_generated/api";
+import { Id } from "../_generated/dataModel";
+import { fetchEmbeddingBatch } from "../util/llm";
 
 const selfInternal = internal.agent.embeddingsCache;
 
@@ -26,7 +30,7 @@ export async function fetchBatch(ctx: ActionCtx, texts: string[]) {
   if (cacheResults.length < texts.length) {
     const missingIndexes = [...results.keys()].filter((i) => !results[i]);
     const missingTexts = missingIndexes.map((i) => texts[i]);
-    const response = await fetchEmbeddingBatch(missingTexts);
+    const response = await fetchEmbeddingBatch(ctx, missingTexts);
     if (response.embeddings.length !== missingIndexes.length) {
       throw new Error(
         `Expected ${missingIndexes.length} embeddings, got ${response.embeddings.length}`,
@@ -42,7 +46,9 @@ export async function fetchBatch(ctx: ActionCtx, texts: string[]) {
     }
   }
   if (toWrite.length > 0) {
-    await ctx.runMutation(selfInternal.writeEmbeddings, { embeddings: toWrite });
+    await ctx.runMutation(selfInternal.writeEmbeddings, {
+      embeddings: toWrite,
+    });
   }
   return {
     embeddings: results,
@@ -54,15 +60,15 @@ export async function fetchBatch(ctx: ActionCtx, texts: string[]) {
 async function hashText(text: string) {
   const textEncoder = new TextEncoder();
   const buf = textEncoder.encode(text);
-  if (typeof crypto === 'undefined') {
+  if (typeof crypto === "undefined") {
     // Ugly, ugly hax to get ESBuild to not try to bundle this node dependency.
-    const f = () => 'node:crypto';
-    const crypto = (await import(f())) as typeof import('crypto');
-    const hash = crypto.createHash('sha256');
+    const f = () => "node:crypto";
+    const crypto = (await import(f())) as typeof import("crypto");
+    const hash = crypto.createHash("sha256");
     hash.update(buf);
     return hash.digest().buffer;
   } else {
-    return await crypto.subtle.digest('SHA-256', buf);
+    return await crypto.subtle.digest("SHA-256", buf);
   }
 }
 
@@ -71,13 +77,15 @@ export const getEmbeddingsByText = internalQuery({
   handler: async (
     ctx,
     args,
-  ): Promise<{ index: number; embeddingId: Id<'embeddingsCache'>; embedding: number[] }[]> => {
+  ): Promise<
+    { index: number; embeddingId: Id<"embeddingsCache">; embedding: number[] }[]
+  > => {
     const out = [];
     for (let i = 0; i < args.textHashes.length; i++) {
       const textHash = args.textHashes[i];
       const result = await ctx.db
-        .query('embeddingsCache')
-        .withIndex('text', (q) => q.eq('textHash', textHash))
+        .query("embeddingsCache")
+        .withIndex("text", (q) => q.eq("textHash", textHash))
         .first();
       if (result) {
         out.push({
@@ -100,10 +108,10 @@ export const writeEmbeddings = internalMutation({
       }),
     ),
   },
-  handler: async (ctx, args): Promise<Id<'embeddingsCache'>[]> => {
+  handler: async (ctx, args): Promise<Id<"embeddingsCache">[]> => {
     const ids = [];
     for (const embedding of args.embeddings) {
-      ids.push(await ctx.db.insert('embeddingsCache', embedding));
+      ids.push(await ctx.db.insert("embeddingsCache", embedding));
     }
     return ids;
   },

@@ -13,9 +13,13 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as agent_connectionProfiles from "../agent/connectionProfiles.js";
 import type * as agent_conversation from "../agent/conversation.js";
 import type * as agent_embeddingsCache from "../agent/embeddingsCache.js";
 import type * as agent_memory from "../agent/memory.js";
+import type * as agent_thoughtConfig from "../agent/thoughtConfig.js";
+import type * as agent_thoughtGenerator from "../agent/thoughtGenerator.js";
+import type * as agent_thoughtState from "../agent/thoughtState.js";
 import type * as aiTown_agent from "../aiTown/agent.js";
 import type * as aiTown_agentDescription from "../aiTown/agentDescription.js";
 import type * as aiTown_agentInputs from "../aiTown/agentInputs.js";
@@ -51,10 +55,10 @@ import type * as init from "../init.js";
 import type * as messages from "../messages.js";
 import type * as music from "../music.js";
 import type * as testing from "../testing.js";
-import type * as util_FastIntegerCompression from "../util/FastIntegerCompression.js";
 import type * as util_assertNever from "../util/assertNever.js";
 import type * as util_asyncMap from "../util/asyncMap.js";
 import type * as util_compression from "../util/compression.js";
+import type * as util_FastIntegerCompression from "../util/FastIntegerCompression.js";
 import type * as util_geometry from "../util/geometry.js";
 import type * as util_isSimpleObject from "../util/isSimpleObject.js";
 import type * as util_llm from "../util/llm.js";
@@ -74,9 +78,13 @@ import type * as world from "../world.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  "agent/connectionProfiles": typeof agent_connectionProfiles;
   "agent/conversation": typeof agent_conversation;
   "agent/embeddingsCache": typeof agent_embeddingsCache;
   "agent/memory": typeof agent_memory;
+  "agent/thoughtConfig": typeof agent_thoughtConfig;
+  "agent/thoughtGenerator": typeof agent_thoughtGenerator;
+  "agent/thoughtState": typeof agent_thoughtState;
   "aiTown/agent": typeof aiTown_agent;
   "aiTown/agentDescription": typeof aiTown_agentDescription;
   "aiTown/agentInputs": typeof aiTown_agentInputs;
@@ -112,10 +120,10 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   music: typeof music;
   testing: typeof testing;
-  "util/FastIntegerCompression": typeof util_FastIntegerCompression;
   "util/assertNever": typeof util_assertNever;
   "util/asyncMap": typeof util_asyncMap;
   "util/compression": typeof util_compression;
+  "util/FastIntegerCompression": typeof util_FastIntegerCompression;
   "util/geometry": typeof util_geometry;
   "util/isSimpleObject": typeof util_isSimpleObject;
   "util/llm": typeof util_llm;
