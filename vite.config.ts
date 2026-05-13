@@ -10,7 +10,7 @@ function memoryFileWriterPlugin(): Plugin {
   return {
     name: "memory-file-writer",
     configureServer(server) {
-      server.middlewares.use("/__memory_sync", async (req, res, next) => {
+      server.middlewares.use("/__memory_save", async (req, res, next) => {
         if (req.method !== "POST") {
           next();
           return;
@@ -23,45 +23,30 @@ function memoryFileWriterPlugin(): Plugin {
           }
           const rawBody = Buffer.concat(chunks).toString("utf8");
           const parsed = JSON.parse(rawBody) as {
-            files?: Array<{ filePath: string; content: string }>;
+            filePath?: string;
+            content?: string;
           };
-          if (!Array.isArray(parsed.files)) {
-            throw new Error("Missing files payload.");
+          if (!parsed.filePath || typeof parsed.content !== "string") {
+            throw new Error("Missing filePath or content payload.");
           }
 
           await fs.mkdir(memoryDir, { recursive: true });
-
-          const expectedTopLevelFiles = new Set<string>();
-
-          for (const file of parsed.files) {
-            const normalized = file.filePath.replace(/^[/\\]+/, "");
-            if (!normalized || normalized.includes("..")) {
-              throw new Error(`Invalid memory file path: ${file.filePath}`);
-            }
-            expectedTopLevelFiles.add(normalized.split("/")[0]);
-            const targetPath = path.resolve(memoryDir, normalized);
-            if (!targetPath.startsWith(memoryDir)) {
-              throw new Error(
-                `Refusing to write outside memory directory: ${file.filePath}`,
-              );
-            }
-            await fs.mkdir(path.dirname(targetPath), { recursive: true });
-            await fs.writeFile(targetPath, file.content, "utf8");
+          const normalized = parsed.filePath.replace(/^[/\\]+/, "");
+          if (!normalized || normalized.includes("..")) {
+            throw new Error(`Invalid memory file path: ${parsed.filePath}`);
           }
-
-          const currentEntries = await fs.readdir(memoryDir, {
-            withFileTypes: true,
-          });
-          for (const entry of currentEntries) {
-            if (!expectedTopLevelFiles.has(entry.name)) {
-              const stalePath = path.resolve(memoryDir, entry.name);
-              await fs.rm(stalePath, { recursive: true, force: true });
-            }
+          const targetPath = path.resolve(memoryDir, normalized);
+          if (!targetPath.startsWith(memoryDir)) {
+            throw new Error(
+              `Refusing to write outside memory directory: ${parsed.filePath}`,
+            );
           }
+          await fs.mkdir(path.dirname(targetPath), { recursive: true });
+          await fs.writeFile(targetPath, parsed.content, "utf8");
 
           res.statusCode = 200;
           res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ ok: true, written: parsed.files.length }));
+          res.end(JSON.stringify({ ok: true, filePath: normalized }));
         } catch (error) {
           res.statusCode = 500;
           res.setHeader("Content-Type", "application/json");
