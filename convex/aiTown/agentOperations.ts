@@ -16,7 +16,7 @@ import { sleep } from '../util/sleep';
 import { serializedPlayer } from './player';
 import { demoMode } from './demoMode';
 import { serializedSceneWorldSeed } from './world';
-import { decideInteractionTiming } from './interactionTiming';
+import { decideInteractionTiming, InteractionTargetCandidate } from './interactionTiming';
 
 export const agentRememberConversation = internalAction({
   args: {
@@ -100,6 +100,14 @@ export const agentDoSomething = internalAction({
     agent: v.object(serializedAgent),
     map: v.object(serializedWorldMap),
     otherFreePlayers: v.array(v.object(serializedPlayer)),
+    joinableConversationTargets: v.array(
+      v.object({
+        player: v.object(serializedPlayer),
+        source: v.union(v.literal('free_player'), v.literal('active_conversation')),
+        conversationId: v.optional(v.string()),
+        participantCount: v.optional(v.number()),
+      }),
+    ),
     sceneState: v.optional(v.object(serializedSceneWorldSeed)),
     operationId: v.string(),
   },
@@ -114,9 +122,16 @@ export const agentDoSomething = internalAction({
     const recentlyAttemptedInvite =
       agent.lastInviteAttempt && now < agent.lastInviteAttempt + CONVERSATION_COOLDOWN;
     const recentActivity = player.activity && now < player.activity.until + ACTIVITY_COOLDOWN;
+    const interactionCandidates: InteractionTargetCandidate[] = [
+      ...args.otherFreePlayers.map((otherPlayer) => ({
+        player: otherPlayer,
+        source: 'free_player' as const,
+      })),
+      ...args.joinableConversationTargets,
+    ];
     const decision = decideInteractionTiming({
       player: args.player,
-      otherFreePlayers: args.otherFreePlayers,
+      interactionCandidates,
       sceneState: args.sceneState,
       justLeftConversation: Boolean(justLeftConversation),
       recentlyAttemptedInvite: Boolean(recentlyAttemptedInvite),

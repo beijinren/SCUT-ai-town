@@ -30,8 +30,8 @@ export default function PlayerDetails({
   const players = [...game.world.players.values()];
   const humanPlayer = players.find((p) => p.human === humanTokenIdentifier);
   const humanConversation = humanPlayer ? game.world.playerConversation(humanPlayer) : undefined;
-  // Always select the other player if we're in a conversation with them.
-  if (humanPlayer && humanConversation) {
+  // 如果当前没有明确选中对象，再默认指向当前会话里的另一个参与者。
+  if (!playerId && humanPlayer && humanConversation) {
     const otherPlayerIds = [...humanConversation.participants.keys()].filter(
       (p) => p !== humanPlayer.id,
     );
@@ -64,7 +64,7 @@ export default function PlayerDetails({
     return null;
   }
   const isMe = humanPlayer && player.id === humanPlayer.id;
-  const canInvite = !isMe && !playerConversation && humanPlayer && !humanConversation;
+  const canInvite = !isMe && !playerConversation && Boolean(humanPlayer);
   const sameConversation =
     !isMe &&
     humanPlayer &&
@@ -157,7 +157,7 @@ export default function PlayerDetails({
           onClick={onStartConversation}
         >
           <div className="h-full bg-clay-700 text-center">
-            <span>Start conversation</span>
+            <span>{humanConversation ? 'Invite into conversation' : 'Start conversation'}</span>
           </div>
         </a>
       )}

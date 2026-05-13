@@ -48,6 +48,11 @@ export interface SpeakingOpportunity {
   reason: string;
 }
 
+export interface DepartureOpportunity {
+  shouldLeave: boolean;
+  reason: string;
+}
+
 export interface ConversationRuleSet {
   getParticipantLimit(): number;
   buildStartState(args: {
@@ -86,4 +91,13 @@ export interface ConversationRuleSet {
     messageCooldownMs: number;
     awkwardTimeoutMs: number;
   }): SpeakingOpportunity;
+  evaluateDepartureOpportunity(args: {
+    playerId: GameId<'players'>;
+    participants: GameId<'players'>[];
+    decisionContext: ConversationDecisionContext;
+    joinedAt: number;
+    now: number;
+    numMessages: number;
+    hasMessages: boolean;
+  }): DepartureOpportunity;
 }

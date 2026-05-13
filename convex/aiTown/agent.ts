@@ -25,6 +25,76 @@ import { insertInput } from './insertInput';
 import { demoMode } from './demoMode';
 import { defaultConversationRules } from './defaultConversationRules';
 import { buildConversationDecisionContext } from './conversationDecisionContext';
+import { InteractionTargetCandidate } from './interactionTiming';
+
+function getOtherConversationPlayers(game: Game, conversation: any, selfId: GameId<'players'>) {
+  return [...conversation.participants.keys()]
+    .filter((participantId) => participantId !== selfId)
+    .map((participantId) => game.world.players.get(participantId))
+    .filter((player): player is NonNullable<typeof player> => Boolean(player));
+}
+
+function getConversationFocusPlayer(
+  game: Game,
+  conversation: any,
+  selfId: GameId<'players'>,
+) {
+  const others = getOtherConversationPlayers(game, conversation, selfId);
+  if (others.length === 0) {
+    return undefined;
+  }
+  const lastSpeaker =
+    conversation.lastMessage?.author && conversation.lastMessage.author !== selfId
+      ? game.world.players.get(conversation.lastMessage.author)
+      : undefined;
+  if (lastSpeaker) {
+    return lastSpeaker;
+  }
+  const expectedSpeaker =
+    conversation.sessionState.nextSpeakerId &&
+    conversation.sessionState.nextSpeakerId !== selfId
+      ? game.world.players.get(conversation.sessionState.nextSpeakerId)
+      : undefined;
+  if (expectedSpeaker) {
+    return expectedSpeaker;
+  }
+  if (conversation.creator !== selfId) {
+    const creator = game.world.players.get(conversation.creator);
+    if (creator) {
+      return creator;
+    }
+  }
+  return others[0];
+}
+
+function buildJoinableConversationTargets(
+  game: Game,
+  playerId: GameId<'players'>,
+): InteractionTargetCandidate[] {
+  const targets: InteractionTargetCandidate[] = [];
+  for (const conversation of game.world.conversations.values()) {
+    if (conversation.participants.has(playerId)) {
+      continue;
+    }
+    if (conversation.sessionState.stage !== 'active') {
+      continue;
+    }
+    if (conversation.participants.size >= defaultConversationRules.getParticipantLimit()) {
+      continue;
+    }
+    const representative = getConversationFocusPlayer(game, conversation, playerId);
+    if (!representative) {
+      continue;
+    }
+    targets.push({
+      player: representative.serialize(),
+      source: 'active_conversation',
+      conversationId: conversation.id,
+      participantCount: conversation.participants.size,
+    });
+  }
+  return targets;
+}
 
 export class Agent {
   id: GameId<'agents'>;
@@ -88,15 +158,18 @@ export class Agent {
     // If we have been wandering but haven't thought about something to do for
     // a while, do something.
     if (!conversation && !doingActivity && (!player.pathfinding || !recentlyAttemptedInvite)) {
+      const otherFreePlayers = [...game.world.players.values()]
+        .filter((p) => p.id !== player.id)
+        .filter(
+          (p) => ![...game.world.conversations.values()].find((c) => c.participants.has(p.id)),
+        )
+        .map((p) => p.serialize());
+      const joinableConversationTargets = buildJoinableConversationTargets(game, player.id);
       this.startOperation(game, now, 'agentDoSomething', {
         worldId: game.worldId,
         player: player.serialize(),
-        otherFreePlayers: [...game.world.players.values()]
-          .filter((p) => p.id !== player.id)
-          .filter(
-            (p) => ![...game.world.conversations.values()].find((c) => c.participants.has(p.id)),
-          )
-          .map((p) => p.serialize()),
+        otherFreePlayers,
+        joinableConversationTargets,
         agent: this.serialize(),
         map: game.worldMap.serialize(),
         sceneState: game.world.sceneState,
@@ -128,22 +201,23 @@ export class Agent {
         delete this.inProgressOperation;
         return;
       }
-      const [otherPlayerId, otherMember] = [...conversation.participants.entries()].find(
-        ([id]) => id !== player.id,
-      )!;
-      const otherPlayer = game.world.players.get(otherPlayerId)!;
+      const otherPlayers = getOtherConversationPlayers(game, conversation, player.id);
+      const otherPlayer = getConversationFocusPlayer(game, conversation, player.id);
+      if (!otherPlayer) {
+        return;
+      }
       if (member.status.kind === 'invited') {
         // Accept a conversation with another agent with some probability and with
         // a human unconditionally.
-        if (otherPlayer.human || Math.random() < INVITE_ACCEPT_PROBABILITY) {
-          console.log(`Agent ${player.id} accepting invite from ${otherPlayer.id}`);
+        if (otherPlayers.some((candidate) => candidate.human) || Math.random() < INVITE_ACCEPT_PROBABILITY) {
+          console.log(`Agent ${player.id} accepting invite into conversation ${conversation.id}`);
           conversation.acceptInvite(game, player);
           // Stop moving so we can start walking towards the other player.
           if (player.pathfinding) {
             delete player.pathfinding;
           }
         } else {
-          console.log(`Agent ${player.id} rejecting invite from ${otherPlayer.id}`);
+          console.log(`Agent ${player.id} rejecting invite into conversation ${conversation.id}`);
           conversation.rejectInvite(game, now, player);
         }
         return;
@@ -151,7 +225,7 @@ export class Agent {
       if (member.status.kind === 'walkingOver') {
         // Leave a conversation if we've been waiting for too long.
         if (member.invited + INVITE_TIMEOUT < now) {
-          console.log(`Giving up on invite to ${otherPlayer.id}`);
+          console.log(`Giving up on invite to conversation ${conversation.id}`);
           conversation.leave(game, now, player);
           return;
         }
@@ -177,7 +251,7 @@ export class Agent {
               y: Math.floor((player.position.y + otherPlayer.position.y) / 2),
             };
           }
-          console.log(`Agent ${player.id} walking towards ${otherPlayer.id}...`, destination);
+          console.log(`Agent ${player.id} walking towards conversation ${conversation.id}...`, destination);
           movePlayer(game, now, player, destination);
         }
         return;
@@ -209,7 +283,7 @@ export class Agent {
         if (!conversation.lastMessage) {
           if (speakingOpportunity.canSpeak) {
             // Grab the lock on the conversation and send a "start" message.
-            console.log(`${player.id} initiating conversation with ${otherPlayer.id}.`);
+            console.log(`${player.id} initiating conversation in ${conversation.id}.`);
             const messageUuid = crypto.randomUUID();
             conversation.setIsTyping(now, player, messageUuid);
             this.startOperation(game, now, 'agentGenerateMessage', {
@@ -226,13 +300,37 @@ export class Agent {
             return;
           }
         }
+        const departureOpportunity = defaultConversationRules.evaluateDepartureOpportunity({
+          playerId: player.id,
+          participants: [...conversation.participants.keys()],
+          decisionContext,
+          joinedAt: started,
+          now,
+          numMessages: conversation.numMessages,
+          hasMessages: Boolean(conversation.lastMessage),
+        });
+        if (departureOpportunity.shouldLeave) {
+          console.log(`${player.id} autonomously leaving conversation ${conversation.id}.`);
+          const messageUuid = crypto.randomUUID();
+          conversation.setIsTyping(now, player, messageUuid);
+          this.startOperation(game, now, 'agentGenerateMessage', {
+            worldId: game.worldId,
+            playerId: player.id,
+            agentId: this.id,
+            conversationId: conversation.id,
+            otherPlayerId: otherPlayer.id,
+            messageUuid,
+            type: 'leave',
+          });
+          return;
+        }
         if (!speakingOpportunity.canSpeak) {
           return;
         }
         // See if the conversation has been going on too long and decide to leave.
         const tooLongDeadline = started + MAX_CONVERSATION_DURATION;
         if (tooLongDeadline < now || conversation.numMessages > MAX_CONVERSATION_MESSAGES) {
-          console.log(`${player.id} leaving conversation with ${otherPlayer.id}.`);
+          console.log(`${player.id} leaving conversation ${conversation.id}.`);
           const messageUuid = crypto.randomUUID();
           conversation.setIsTyping(now, player, messageUuid);
           this.startOperation(game, now, 'agentGenerateMessage', {
@@ -247,7 +345,7 @@ export class Agent {
           return;
         }
         // Grab the lock and send a message!
-        console.log(`${player.id} continuing conversation with ${otherPlayer.id}.`);
+        console.log(`${player.id} continuing conversation ${conversation.id}.`);
         const messageUuid = crypto.randomUUID();
         conversation.setIsTyping(now, player, messageUuid);
         this.startOperation(game, now, 'agentGenerateMessage', {

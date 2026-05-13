@@ -1,4 +1,4 @@
-import { blocked, movePlayer, stopPlayer } from './movement';
+import { stopPlayer } from './movement';
 import { Point } from '../util/types';
 import { distance, normalize, vector } from '../util/geometry';
 import { CONVERSATION_DISTANCE } from '../constants';
@@ -11,6 +11,8 @@ import {
 import { ConversationMembership } from './conversationMembership';
 import { GameId, parseGameId } from './ids';
 
+const MAX_CONVERSATION_PARTICIPANTS = 6;
+
 function defaultSessionState(): SerializedConversationSessionState {
   return {
     stage: 'inviting',
@@ -22,16 +24,55 @@ function defaultSessionState(): SerializedConversationSessionState {
   };
 }
 
-function chooseOtherParticipant(
+function chooseNextParticipant(
   participants: GameId<'players'>[],
-  senderId: GameId<'players'>,
+  currentPlayerId: GameId<'players'>,
 ): GameId<'players'> | undefined {
-  return participants.find((participantId) => participantId !== senderId);
+  if (participants.length <= 1) {
+    return undefined;
+  }
+  const index = participants.findIndex((participantId) => participantId === currentPlayerId);
+  if (index === -1) {
+    return participants[0];
+  }
+  return participants[(index + 1) % participants.length];
+}
+
+function hasReachedConversationCluster(
+  player: { position: Point },
+  participatingPlayers: Array<{ position: Point }>,
+) {
+  return participatingPlayers.some(
+    (otherPlayer) => distance(player.position, otherPlayer.position) < CONVERSATION_DISTANCE,
+  );
+}
+
+function orientAroundCentroid(
+  participants: Array<{
+    player: { position: Point; pathfinding?: unknown; facing: { dx: number; dy: number } };
+  }>,
+) {
+  if (participants.length < 2) {
+    return;
+  }
+  const centroid = participants.reduce(
+    (acc, { player }) => ({
+      x: acc.x + player.position.x / participants.length,
+      y: acc.y + player.position.y / participants.length,
+    }),
+    { x: 0, y: 0 },
+  );
+  for (const { player } of participants) {
+    const facingVector = normalize(vector(player.position, centroid));
+    if (!player.pathfinding && facingVector) {
+      player.facing = facingVector;
+    }
+  }
 }
 
 export const defaultConversationRules: ConversationRuleSet = {
   getParticipantLimit() {
-    return 2;
+    return MAX_CONVERSATION_PARTICIPANTS;
   },
 
   buildStartState({ creatorId, inviteeId }): ConversationStartState {
@@ -53,67 +94,95 @@ export const defaultConversationRules: ConversationRuleSet = {
     participants,
     sessionState,
   }): ConversationActivationResult {
-    if (participants.length !== 2) {
+    if (participants.length < 2) {
       return { shouldActivate: false, sessionState };
     }
-    const [first, second] = participants;
-    const member1 = first.membership;
-    const member2 = second.membership;
-    const player1 = first.player;
-    const player2 = second.player;
+    const participating = participants.filter(
+      ({ membership }) => membership.status.kind === 'participating',
+    );
+    const walkingOver = participants.filter(({ membership }) => membership.status.kind === 'walkingOver');
+    const invited = participants.filter(({ membership }) => membership.status.kind === 'invited');
 
-    if (!(member1.status.kind === 'walkingOver' && member2.status.kind === 'walkingOver')) {
-      return { shouldActivate: false, sessionState };
-    }
-    const playerDistance = distance(player1.position, player2.position);
-    if (playerDistance >= CONVERSATION_DISTANCE) {
+    if (participating.length === 0) {
+      if (invited.length > 0 || walkingOver.length < 2) {
+        return { shouldActivate: false, sessionState };
+      }
+      const [anchor, ...rest] = walkingOver;
+      const allNearby = rest.every(
+        ({ player }) => distance(anchor.player.position, player.position) < CONVERSATION_DISTANCE,
+      );
+      if (!allNearby) {
+        return {
+          shouldActivate: false,
+          sessionState: {
+            ...sessionState,
+            stage: 'approaching',
+          },
+        };
+      }
+      for (const { player, membership } of walkingOver) {
+        stopPlayer(player);
+        membership.status = { kind: 'participating', started: now };
+      }
       return {
-        shouldActivate: false,
+        shouldActivate: true,
         sessionState: {
-          ...sessionState,
-          stage: 'approaching',
+          stage: 'active',
+          turnPolicy: sessionState.turnPolicy ?? 'flexible',
+          interruptionPolicy: sessionState.interruptionPolicy ?? 'timed',
+          currentSpeakerId: sessionState.currentSpeakerId ?? anchor.player.id,
+          nextSpeakerId:
+            sessionState.nextSpeakerId ??
+            chooseNextParticipant(
+              walkingOver.map(({ player }) => player.id),
+              anchor.player.id,
+            ),
+          listeningParticipantIds: walkingOver
+            .map(({ player }) => player.id)
+            .filter((playerId) => playerId !== (sessionState.currentSpeakerId ?? anchor.player.id)),
+          currentTurnStreak: sessionState.currentTurnStreak ?? 0,
+          maxConsecutiveTurns: sessionState.maxConsecutiveTurns ?? 2,
+          interruptAfterMs: sessionState.interruptAfterMs ?? 8_000,
+          lastTurnAt: now,
         },
       };
     }
 
-    stopPlayer(player1);
-    stopPlayer(player2);
-    member1.status = { kind: 'participating', started: now };
-    member2.status = { kind: 'participating', started: now };
-
-    const neighbors = (p: Point) => [
-      { x: p.x + 1, y: p.y },
-      { x: p.x - 1, y: p.y },
-      { x: p.x, y: p.y + 1 },
-      { x: p.x, y: p.y - 1 },
-    ];
-    const floorPos1 = { x: Math.floor(player1.position.x), y: Math.floor(player1.position.y) };
-    const p1Candidates = neighbors(floorPos1).filter((p) => !blocked(game, now, p, player1.id));
-    p1Candidates.sort((a, b) => distance(a, player2.position) - distance(b, player2.position));
-    if (p1Candidates.length > 0) {
-      const p1Candidate = p1Candidates[0];
-      const p2Candidates = neighbors(p1Candidate).filter((p) => !blocked(game, now, p, player2.id));
-      p2Candidates.sort((a, b) => distance(a, player2.position) - distance(b, player2.position));
-      if (p2Candidates.length > 0) {
-        const p2Candidate = p2Candidates[0];
-        movePlayer(game, now, player1, p1Candidate, true);
-        movePlayer(game, now, player2, p2Candidate, true);
+    let joinedAny = false;
+    for (const { player, membership } of walkingOver) {
+      if (hasReachedConversationCluster(player, participating.map(({ player }) => player))) {
+        stopPlayer(player);
+        membership.status = { kind: 'participating', started: now };
+        joinedAny = true;
       }
     }
+    const fallbackSpeaker =
+      participating[0]?.player.id ?? participants[0].player.id;
+    const currentSpeakerId = sessionState.currentSpeakerId
+      ? parseGameId('players', sessionState.currentSpeakerId)
+      : fallbackSpeaker;
 
     return {
-      shouldActivate: true,
+      shouldActivate: joinedAny,
       sessionState: {
+        ...sessionState,
         stage: 'active',
         turnPolicy: sessionState.turnPolicy ?? 'flexible',
         interruptionPolicy: sessionState.interruptionPolicy ?? 'timed',
-        currentSpeakerId: sessionState.currentSpeakerId ?? player1.id,
-        nextSpeakerId: sessionState.nextSpeakerId ?? player2.id,
-        listeningParticipantIds: [player2.id],
+        currentSpeakerId,
+        nextSpeakerId:
+          sessionState.nextSpeakerId ??
+          chooseNextParticipant(
+            participants.map(({ player }) => player.id),
+            currentSpeakerId,
+          ),
+        listeningParticipantIds: participants
+          .map(({ player }) => player.id)
+          .filter((playerId) => playerId !== currentSpeakerId),
         currentTurnStreak: sessionState.currentTurnStreak ?? 0,
         maxConsecutiveTurns: sessionState.maxConsecutiveTurns ?? 2,
         interruptAfterMs: sessionState.interruptAfterMs ?? 8_000,
-        lastTurnAt: now,
+        lastTurnAt: sessionState.lastTurnAt ?? now,
       },
     };
   },
@@ -129,7 +198,7 @@ export const defaultConversationRules: ConversationRuleSet = {
         ...sessionState,
         stage: 'active',
         currentSpeakerId: senderId,
-        nextSpeakerId: chooseOtherParticipant(participants, senderId),
+        nextSpeakerId: chooseNextParticipant(participants, senderId),
         listeningParticipantIds: participants.filter((participantId) => participantId !== senderId),
         currentTurnStreak,
         lastTurnAt: timestamp,
@@ -146,7 +215,7 @@ export const defaultConversationRules: ConversationRuleSet = {
     if (sessionState.nextSpeakerId) {
       return parseGameId('players', sessionState.nextSpeakerId);
     }
-    return chooseOtherParticipant(
+    return chooseNextParticipant(
       participants,
       sessionState.currentSpeakerId
         ? parseGameId('players', sessionState.currentSpeakerId)
@@ -261,21 +330,60 @@ export const defaultConversationRules: ConversationRuleSet = {
       reason: '当前仍应由他人发言或继续等待。',
     };
   },
+
+  evaluateDepartureOpportunity({
+    participants,
+    decisionContext,
+    joinedAt,
+    now,
+    numMessages,
+    hasMessages,
+  }) {
+    if (!hasMessages) {
+      return {
+        shouldLeave: false,
+        reason: '会话刚开始，暂不考虑退出。',
+      };
+    }
+
+    if (participants.length <= 2) {
+      return {
+        shouldLeave: false,
+        reason: '当前只剩两人，退出会直接结束会话，因此暂不主动离开。',
+      };
+    }
+
+    const timeInConversation = now - joinedAt;
+    const { needs, memorySignals } = decisionContext.speaker;
+    const fatigueScore =
+      needs.listeningPreference +
+      memorySignals.preferListening +
+      (1 - needs.initiativeNeed) +
+      (1 - needs.responseUrgency);
+
+    if (participants.length >= 4 && timeInConversation >= 10_000 && fatigueScore >= 1.9) {
+      return {
+        shouldLeave: true,
+        reason: '当前参与者较多，且你更偏向旁听或低调观察，因此会自然退出，把对话留给其他人继续。',
+      };
+    }
+
+    if (numMessages >= 8 && timeInConversation >= 15_000 && fatigueScore >= 1.7) {
+      return {
+        shouldLeave: true,
+        reason: '这段对话已经持续了一段时间，而你当前继续留下的动力不强，因此会选择先离开。',
+      };
+    }
+
+    return {
+      shouldLeave: false,
+      reason: '当前还没有强到足以主动离开的信号。',
+    };
+  },
 };
 
 export function orientConversationParticipants(
   participants: Array<{ playerId: GameId<'players'>; player: { position: Point; pathfinding?: unknown; facing: { dx: number; dy: number } } }>,
 ) {
-  if (participants.length !== 2) {
-    return;
-  }
-  const [first, second] = participants;
-  const facingVector = normalize(vector(first.player.position, second.player.position));
-  if (!first.player.pathfinding && facingVector) {
-    first.player.facing = facingVector;
-  }
-  if (!second.player.pathfinding && facingVector) {
-    second.player.facing.dx = -facingVector.dx;
-    second.player.facing.dy = -facingVector.dy;
-  }
+  orientAroundCentroid(participants);
 }

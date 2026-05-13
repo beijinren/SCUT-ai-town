@@ -2,6 +2,13 @@ import { distance } from '../util/geometry';
 import { SceneWorldSeed } from './sceneTypes';
 import { SerializedPlayer } from './player';
 
+export interface InteractionTargetCandidate {
+  player: SerializedPlayer;
+  source: 'free_player' | 'active_conversation';
+  conversationId?: string;
+  participantCount?: number;
+}
+
 export interface InteractionDecisionReason {
   code: string;
   message: string;
@@ -12,6 +19,9 @@ export interface InteractionCandidateScore {
   playerId: string;
   score: number;
   distance: number;
+  source: 'free_player' | 'active_conversation';
+  conversationId?: string;
+  participantCount?: number;
   reasons: InteractionDecisionReason[];
 }
 
@@ -41,12 +51,12 @@ function sceneDiscouragesApproach(sceneState?: SceneWorldSeed) {
 
 function scoreCandidate(
   player: SerializedPlayer,
-  otherPlayer: SerializedPlayer,
+  candidate: InteractionTargetCandidate,
   sceneState?: SceneWorldSeed,
 ): InteractionCandidateScore {
   const candidateReasons: InteractionDecisionReason[] = [];
   let score = 0;
-  const candidateDistance = distance(player.position, otherPlayer.position);
+  const candidateDistance = distance(player.position, candidate.player.position);
 
   if (candidateDistance <= 4) {
     score += 3;
@@ -77,7 +87,7 @@ function scoreCandidate(
     });
   }
 
-  if (otherPlayer.activity) {
+  if (candidate.player.activity) {
     score -= 1.5;
     candidateReasons.push({
       code: 'target_busy',
@@ -102,17 +112,38 @@ function scoreCandidate(
     });
   }
 
+  if (candidate.source === 'active_conversation') {
+    score += 1.5;
+    candidateReasons.push({
+      code: 'active_conversation_bonus',
+      message: '目标当前处在已开始的会话里，加入后更容易快速形成多人交流。',
+      scoreDelta: 1.5,
+    });
+    if (candidate.participantCount && candidate.participantCount >= 2) {
+      const additionalScore = Math.min(1, (candidate.participantCount - 1) * 0.5);
+      score += additionalScore;
+      candidateReasons.push({
+        code: 'group_size_bonus',
+        message: `当前会话已有 ${candidate.participantCount} 人，具备扩展成多人交流的基础。`,
+        scoreDelta: additionalScore,
+      });
+    }
+  }
+
   return {
-    playerId: otherPlayer.id,
+    playerId: candidate.player.id,
     score,
     distance: candidateDistance,
+    source: candidate.source,
+    conversationId: candidate.conversationId,
+    participantCount: candidate.participantCount,
     reasons: candidateReasons,
   };
 }
 
 export function decideInteractionTiming(args: {
   player: SerializedPlayer;
-  otherFreePlayers: SerializedPlayer[];
+  interactionCandidates: InteractionTargetCandidate[];
   sceneState?: SceneWorldSeed;
   justLeftConversation: boolean;
   recentlyAttemptedInvite: boolean;
@@ -120,7 +151,7 @@ export function decideInteractionTiming(args: {
 }): InteractionDecisionResult {
   const {
     player,
-    otherFreePlayers,
+    interactionCandidates,
     sceneState,
     justLeftConversation,
     recentlyAttemptedInvite,
@@ -171,10 +202,10 @@ export function decideInteractionTiming(args: {
     };
   }
 
-  if (otherFreePlayers.length === 0) {
+  if (interactionCandidates.length === 0) {
     reasons.push({
       code: 'no_candidates',
-      message: '当前没有可接触的空闲对象。',
+      message: '当前没有合适的接触对象，也没有可加入的现有会话。',
     });
     return {
       shouldInitiate: false,
@@ -185,8 +216,8 @@ export function decideInteractionTiming(args: {
     };
   }
 
-  const candidateScores = otherFreePlayers
-    .map((otherPlayer) => scoreCandidate(player, otherPlayer, sceneState))
+  const candidateScores = interactionCandidates
+    .map((candidate) => scoreCandidate(player, candidate, sceneState))
     .sort((a, b) => b.score - a.score);
 
   const bestCandidate = candidateScores[0];

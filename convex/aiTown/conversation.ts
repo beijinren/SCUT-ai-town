@@ -63,8 +63,8 @@ export class Conversation {
     if (this.isTyping && this.isTyping.since + TYPING_TIMEOUT < now) {
       delete this.isTyping;
     }
-    if (this.participants.size !== defaultConversationRules.getParticipantLimit()) {
-      console.warn(`Conversation ${this.id} has ${this.participants.size} participants`);
+    if (this.participants.size > defaultConversationRules.getParticipantLimit()) {
+      console.warn(`Conversation ${this.id} exceeded participant limit: ${this.participants.size}`);
       return;
     }
     const participants = [...this.participants.keys()].map((playerId) => ({
@@ -82,10 +82,12 @@ export class Conversation {
 
     if (this.sessionState.stage === 'active') {
       orientConversationParticipants(
-        participants.map(({ player, membership }) => ({
-          playerId: membership.playerId,
-          player,
-        })),
+        participants
+          .filter(({ membership }) => membership.status.kind === 'participating')
+          .map(({ player, membership }) => ({
+            playerId: membership.playerId,
+            player,
+          })),
       );
     }
   }
@@ -94,17 +96,26 @@ export class Conversation {
     if (player.id === invitee.id) {
       throw new Error(`Can't invite yourself to a conversation`);
     }
-    // Ensure the players still exist.
-    if ([...game.world.conversations.values()].find((c) => c.participants.has(player.id))) {
-      const reason = `Player ${player.id} is already in a conversation`;
+    const playerConversation = game.world.playerConversation(player);
+    const inviteeConversation = game.world.playerConversation(invitee);
+
+    if (playerConversation && inviteeConversation) {
+      if (playerConversation.id === inviteeConversation.id) {
+        return { conversationId: playerConversation.id };
+      }
+      const reason = `Both players are already in different conversations`;
       console.log(reason);
       return { error: reason };
     }
-    if ([...game.world.conversations.values()].find((c) => c.participants.has(invitee.id))) {
-      const reason = `Player ${player.id} is already in a conversation`;
-      console.log(reason);
-      return { error: reason };
+
+    if (playerConversation) {
+      return playerConversation.inviteParticipant(now, invitee);
     }
+
+    if (inviteeConversation) {
+      return inviteeConversation.inviteParticipant(now, player);
+    }
+
     const conversationId = game.allocId('conversations');
     console.log(`Creating conversation ${conversationId}`);
     const startState = defaultConversationRules.buildStartState({
@@ -127,6 +138,26 @@ export class Conversation {
       }),
     );
     return { conversationId };
+  }
+
+  inviteParticipant(now: number, invitee: Player) {
+    if (this.participants.has(invitee.id)) {
+      return { conversationId: this.id };
+    }
+    if (this.participants.size >= defaultConversationRules.getParticipantLimit()) {
+      const reason = `Conversation ${this.id} is already full`;
+      console.log(reason);
+      return { error: reason };
+    }
+    this.participants.set(
+      invitee.id,
+      new ConversationMembership({
+        playerId: invitee.id,
+        invited: now,
+        status: { kind: 'invited' },
+      }),
+    );
+    return { conversationId: this.id };
   }
 
   setIsTyping(now: number, player: Player, messageUuid: string) {
@@ -184,7 +215,33 @@ export class Conversation {
     if (!member) {
       throw new Error(`Couldn't find membership for ${this.id}:${player.id}`);
     }
-    this.stop(game, now);
+    delete this.isTyping;
+    this.participants.delete(player.id);
+    const agent = [...game.world.agents.values()].find((a) => a.playerId === player.id);
+    if (agent) {
+      agent.lastConversation = now;
+      agent.toRemember = this.id;
+    }
+    if (this.participants.size < 2) {
+      this.stop(game, now);
+      return;
+    }
+    const remainingParticipants = [...this.participants.keys()];
+    const currentSpeakerId = this.sessionState.currentSpeakerId;
+    if (!currentSpeakerId || currentSpeakerId === player.id) {
+      this.sessionState.currentSpeakerId = remainingParticipants[0];
+      this.sessionState.currentTurnStreak = 0;
+    }
+    if (!this.sessionState.nextSpeakerId || this.sessionState.nextSpeakerId === player.id) {
+      const currentSpeaker =
+        this.sessionState.currentSpeakerId ?? remainingParticipants[0];
+      const currentIndex = remainingParticipants.findIndex((id) => id === currentSpeaker);
+      this.sessionState.nextSpeakerId =
+        remainingParticipants[(currentIndex + 1) % remainingParticipants.length];
+    }
+    this.sessionState.listeningParticipantIds = remainingParticipants.filter(
+      (participantId) => participantId !== this.sessionState.currentSpeakerId,
+    );
   }
 
   serialize(): SerializedConversation {
@@ -227,8 +284,8 @@ export type SerializedConversation = ObjectType<typeof serializedConversation>;
 
 export const conversationInputs = {
   // Start a conversation, inviting the specified player.
-  // Conversations can only have two participants for now,
-  // so we don't have a separate "invite" input.
+  // If the inviter is already in a conversation, this input adds the invitee
+  // to that same conversation instead of creating a brand new one.
   startConversation: inputHandler({
     args: {
       playerId,

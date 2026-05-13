@@ -1,6 +1,10 @@
 import { defaultConversationRules } from './defaultConversationRules';
 
 describe('defaultConversationRules', () => {
+  test('默认规则允许超过两人参与同一会话', () => {
+    expect(defaultConversationRules.getParticipantLimit()).toBeGreaterThan(2);
+  });
+
   test('创建会话时会生成双人默认进入状态', () => {
     const result = defaultConversationRules.buildStartState({
       creatorId: 'p:1' as any,
@@ -30,6 +34,23 @@ describe('defaultConversationRules', () => {
     expect(result.sessionState.currentSpeakerId).toBe('p:1');
     expect(result.sessionState.nextSpeakerId).toBe('p:2');
     expect(result.sessionState.lastTurnAt).toBe(123);
+  });
+
+  test('多人会话里，下一轮发言权会按参与顺序轮转', () => {
+    const result = defaultConversationRules.onMessageSent({
+      senderId: 'p:2' as any,
+      participants: ['p:1', 'p:2', 'p:3'] as any,
+      sessionState: {
+        stage: 'active',
+        currentSpeakerId: 'p:2' as any,
+        nextSpeakerId: 'p:3' as any,
+      },
+      timestamp: 456,
+    });
+
+    expect(result.sessionState.currentSpeakerId).toBe('p:2');
+    expect(result.sessionState.nextSpeakerId).toBe('p:3');
+    expect(result.sessionState.listeningParticipantIds).toEqual(['p:1', 'p:3']);
   });
 
   test('对方长时间不回应时，当前说话者可以继续补充发言', () => {
@@ -165,5 +186,67 @@ describe('defaultConversationRules', () => {
     });
 
     expect(opportunity.canSpeak).toBe(false);
+  });
+
+  test('多人会话里，偏向旁听的角色会自主退出，剩余成员可继续聊', () => {
+    const departure = defaultConversationRules.evaluateDepartureOpportunity({
+      playerId: 'p:4' as any,
+      participants: ['p:1', 'p:2', 'p:3', 'p:4'] as any,
+      decisionContext: {
+        speaker: {
+          playerId: 'p:4' as any,
+          needs: {
+            initiativeNeed: 0.2,
+            responseUrgency: 0.2,
+            interruptionUrgency: 0.1,
+            listeningPreference: 0.9,
+          },
+          memorySignals: {
+            topicalRelevance: 0,
+            unresolvedTension: 0,
+            rapportConfidence: 0,
+            preferListening: 0.6,
+          },
+        },
+        listeners: [],
+      },
+      joinedAt: 0,
+      now: 12_000,
+      numMessages: 5,
+      hasMessages: true,
+    });
+
+    expect(departure.shouldLeave).toBe(true);
+  });
+
+  test('双人会话里不会轻易触发自主退出', () => {
+    const departure = defaultConversationRules.evaluateDepartureOpportunity({
+      playerId: 'p:1' as any,
+      participants: ['p:1', 'p:2'] as any,
+      decisionContext: {
+        speaker: {
+          playerId: 'p:1' as any,
+          needs: {
+            initiativeNeed: 0.1,
+            responseUrgency: 0.1,
+            interruptionUrgency: 0.1,
+            listeningPreference: 1,
+          },
+          memorySignals: {
+            topicalRelevance: 0,
+            unresolvedTension: 0,
+            rapportConfidence: 0,
+            preferListening: 1,
+          },
+        },
+        listeners: [],
+      },
+      joinedAt: 0,
+      now: 20_000,
+      numMessages: 12,
+      hasMessages: true,
+    });
+
+    expect(departure.shouldLeave).toBe(false);
   });
 });
