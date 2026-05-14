@@ -1,5 +1,9 @@
 import { calculateWillingnessScores } from '../willingness/willingnessCalculator';
-import { resolveTurnOrder } from '../willingness/turnOrderResolver';
+import {
+  buildGMWillingnessExtensionRequest,
+  resolveTurnOrder,
+  resolveTurnOrderFromExternalScores,
+} from '../willingness/turnOrderResolver';
 import { shouldRecomputeWillingness } from '../willingness/willingnessTrigger';
 import { GMWillingnessContext } from '../gmTypes';
 
@@ -55,5 +59,35 @@ describe('willingness', () => {
     expect(baselineBob).toBeDefined();
     expect(penalizedBob).toBeDefined();
     expect((penalizedBob?.score ?? 0)).toBeLessThan(baselineBob?.score ?? 0);
+  });
+
+  it('supports externally provided willingness scores', () => {
+    const result = resolveTurnOrderFromExternalScores(
+      [
+        { agentId: 'alice', score: 30, reason: 'self score' },
+        { agentId: 'bob', score: 90, reason: 'self score' },
+        { agentId: 'charlie', score: 10, reason: 'self score' },
+      ],
+      'direct_question',
+    );
+    expect(result.selectedNextSpeaker).toBe('bob');
+    expect(result.usedExternalScores).toBe(true);
+  });
+
+  it('builds a GM extension request when top scores tie', () => {
+    const result = resolveTurnOrderFromExternalScores(
+      [
+        { agentId: 'alice', score: 80, reason: 'self score' },
+        { agentId: 'bob', score: 80, reason: 'self score' },
+      ],
+      'direct_question',
+    );
+    const extensionRequest = buildGMWillingnessExtensionRequest({
+      conversationId: 'c1',
+      triggerReason: 'direct_question',
+      ranking: result.ranking,
+    });
+    expect(extensionRequest).not.toBeNull();
+    expect(extensionRequest?.conflict.type).toBe('score_tie');
   });
 });

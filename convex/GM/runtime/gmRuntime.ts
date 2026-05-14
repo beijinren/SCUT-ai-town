@@ -8,12 +8,17 @@ import { buildRegenerationPrompt } from '../intervention/regenerate';
 import { normalizeGMContext } from './gmContextLoader';
 import { runGMPipeline } from './gmPipeline';
 import {
+  GMExternalWillingnessScore,
   GMGuardContext,
   GMRuntimeContext,
   GMWillingnessContext,
 } from '../gmTypes';
 import { calculateWillingnessScores } from '../willingness/willingnessCalculator';
-import { resolveTurnOrder } from '../willingness/turnOrderResolver';
+import {
+  buildGMWillingnessExtensionRequest,
+  resolveTurnOrder,
+  resolveTurnOrderFromExternalScores as resolveExternalTurnOrder,
+} from '../willingness/turnOrderResolver';
 import { shouldRecomputeWillingness } from '../willingness/willingnessTrigger';
 import { buildWillingnessDebugRecord } from '../willingness/willingnessDebug';
 import { handleSimulatedToolAction } from '../tools/simulatedToolHandler';
@@ -93,6 +98,59 @@ export class GMRuntime {
     return handleSimulatedToolAction(actionIntent);
   }
 
+  /**
+   * GM should only get involved in willingness when the conversation intent
+   * actually changes. The teammate-owned willingness scorer can use this as a
+   * lightweight gate before asking every agent to score itself.
+   */
+  shouldRefreshTurnOrder(context: GMWillingnessContext) {
+    return shouldRecomputeWillingness(context);
+  }
+
+  /**
+   * Preferred path:
+   * the main willingness score comes from external agent-side logic,
+   * while GM only provides trigger timing, stable sorting, and an optional
+   * future extension hook for rare ties or conflicts.
+   */
+  resolveTurnOrderFromExternalScores(
+    context: GMWillingnessContext,
+    externalScores: GMExternalWillingnessScore[],
+  ) {
+    const trigger = shouldRecomputeWillingness(context);
+    if (!trigger) {
+      return null;
+    }
+    const result = resolveExternalTurnOrder(externalScores, trigger);
+    recordWillingnessDebug(buildWillingnessDebugRecord(context.conversationId, trigger, result));
+    return result;
+  }
+
+  /**
+   * This only builds a future extension payload.
+   * No GM tie-break model is executed here yet.
+   */
+  buildWillingnessExtensionRequest(
+    context: GMWillingnessContext,
+    externalScores: GMExternalWillingnessScore[],
+  ) {
+    const trigger = shouldRecomputeWillingness(context);
+    if (!trigger) {
+      return null;
+    }
+    const result = resolveExternalTurnOrder(externalScores, trigger);
+    return buildGMWillingnessExtensionRequest({
+      conversationId: context.conversationId,
+      triggerReason: trigger,
+      ranking: result.ranking,
+    });
+  }
+
+  /**
+   * Backward-compatible fallback.
+   * Keep this for demos and tests until the external scorer fully owns
+   * willingness in production flows.
+   */
   resolveTurnOrder(context: GMWillingnessContext) {
     const trigger = shouldRecomputeWillingness(context) ?? 'manual_refresh';
     const scores = calculateWillingnessScores(context);

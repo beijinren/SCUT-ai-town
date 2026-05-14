@@ -13,3 +13,8 @@ dist/
 node_modules/
 .convex/
 dist/
+.env.local
+.env
+node_modules/
+.convex/
+dist/

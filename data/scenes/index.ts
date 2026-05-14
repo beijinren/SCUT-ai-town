@@ -1,5 +1,7 @@
 import { buildSceneProtocol } from '../../convex/aiTown/sceneProtocol';
 import { SceneAgentSeed, SceneProtocol, StructuredScene } from '../../convex/aiTown/sceneTypes';
+import { scenarioConfigToStructuredScene } from '../../convex/GM/setup/scenarioConfigAdapter';
+import crossMajorCreativeWorkshopConfig from '../scenarios/cross_major_creative_workshop_ai_town/scenario_config.json';
 import { casualCommonAreaScene } from './casualCommonArea';
 import { pressConferenceScene } from './pressConference';
 
@@ -38,8 +40,15 @@ export const casualCommonAreaTemplate: SceneTemplateDefinition = {
   scene: casualCommonAreaScene,
 };
 
-// 当前默认实验模板已切换为更轻松的公共休息区场景。
-export const defaultSceneTemplate = createSceneTemplateRuntime(casualCommonAreaTemplate);
+export const crossMajorCreativeWorkshopTemplate: SceneTemplateDefinition = {
+  id: 'cross-major-creative-workshop-ai-town',
+  label: '跨专业创新工作坊',
+  scene: scenarioConfigToStructuredScene(crossMajorCreativeWorkshopConfig),
+};
+
+// 主链路仍然是 init.ts 读取 defaultSceneProtocol，再生成 world 和 agent。
+// 这里仅把默认输入切到统一场景库，避免 world/agent 和 persona 发牌器读两套模板。
+export const defaultSceneTemplate = createSceneTemplateRuntime(crossMajorCreativeWorkshopTemplate);
 
 export const defaultSceneProtocol = defaultSceneTemplate.protocol;
 

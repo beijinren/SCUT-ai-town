@@ -1,3 +1,5 @@
+// Runtime behavior knobs for the GM sidecar.
+// Model/API settings live separately in gmModelConfig.ts so GM can use its own model.
 export const gmConfig = {
   defaultRoomName: 'UnknownRoom',
   defaultZoneName: 'UnknownZone',

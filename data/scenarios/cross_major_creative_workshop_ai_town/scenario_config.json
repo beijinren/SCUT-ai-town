@@ -1,0 +1,248 @@
+{
+  "run_name": "cross_major_creative_workshop_ai_town",
+  "scenario": "在 AI-town 校园创新中心的一间可移动桌椅的创意教室里，下午的跨专业创意工作坊正在进行。场景为一次 90 分钟的快速共创：7 位参与者需要在限定时间内，协作构思并初步勾勒出一个面向校园的“学生服务工具”原型（如 App、小程序、线下服务结合等）。\n\n空间与时间流动：大家先在 innovation_hub_entrance 集合，由组织者简单暖场后，走入 workshop_main_room，围成一桌坐好；过程中有机会去 whiteboard_zone 画草图，或到 hallway_coffee_corner 接水、短暂私聊，再回到主桌讨论。靠窗一角是 mentor_spot，助教可以在那里单独指导某位紧张的同学或观察整体互动。整个流程需要在规定时间内产出一个清晰的服务概念，并初步列出核心功能和用户场景。\n\n结构与角色：\n- 组织者负责流程把控和时间压力提醒，需要在短时间内让大家达成收敛。\n- 计算机学生和设计学生是典型“技术 + 设计”组合，擅长提出解决方案，但可能主导讨论。\n- 心理学学生关注用户情绪与需求，希望把工具做得真正帮助到有压力的同学。\n- 一位表达欲很强的同学容易占据话语权，既可能推动进展，也可能压制他人。\n- 一位沉默观察者性格内向、社交焦虑，是本次需要特别关注的人，既有独到观察，又难以开口。\n- 助教兼顾指导与照顾氛围，希望鼓励安静或紧张的成员发声，必要时通过非公开的支持或非语言提示来调节气氛。\n\n潜在张力与信息不对称：\n- 时间压力：需要在工作坊结束前产出可展示的工具原型草案，组织者不断提醒时间，可能引发紧张感。\n- 话语权不均：表达欲强的同学与自信的技术/设计同学容易主导讨论，沉默观察者和紧张成员很可能被忽视。\n- 目标偏好不同：技术可行性 vs 视觉冲击力 vs 心理关怀深度之间存在冲突，需要在一个方案里平衡。\n- 关系结构：组织者与助教彼此熟悉且对流程更了解；部分学生互相不认识，沉默观察者尤其不熟悉群体。\n\n工作坊目标：\n1. 在有限时间内，围绕“校园服务工具”共创一个清晰的原型概念（目标用户、主要场景、几项核心功能），并能简要说明为何有价值。\n2. 在讨论过程中，让不同背景的人都能实质参与，尤其要确保沉默观察者与相对紧张的成员被具体邀请和倾听。\n3. 鼓励至少一次使用非语言行为（如在白板画草图、比划界面、点头示意等）推动讨论，并至少发生一次私下的支持性信息，用于帮助某位不太敢发言的成员。\n\n对话重点：\n- 明确各自的专业优势与期待。\n- 主动点名（礼貌地）邀请安静成员分享观察或想法，具体到“你觉得哪个场景最重要？”这类问题。\n- 在不同构想之间进行取舍，在技术可行、设计体验和心理支持效果之间做具体权衡，逐步收敛到一个原型方向。\n- 在不引发冲突的前提下，温和限制话语过多者的时间，让更多人参与。\n\n最终要形成一个可以在白板或纸上画出来的服务工具概念，并约定谁在结尾向全场其他小组做 1 分钟汇报。",
+  "location": "campus_store",
+  "locations": [
+    "campus_store",
+    "coffee_corner"
+  ],
+  "action_affordances": [
+    "walk_to_innovation_hub_entrance",
+    "walk_to_workshop_main_room",
+    "walk_to_whiteboard_zone",
+    "walk_to_hallway_coffee_corner",
+    "walk_to_mentor_spot",
+    "sit_down_at_table",
+    "stand_up_to_speak",
+    "open_laptop_for_notes",
+    "pick_up_marker_and_draw",
+    "hand_notebook_to_someone",
+    "pour_water_at_dispenser",
+    "check_phone_for_time",
+    "gesture_nod_or_shake_head",
+    "pass_sticky_notes",
+    "leave_room_for_break"
+  ],
+  "action_policy": {
+    "mode": "balanced",
+    "force_physical_actions": true,
+    "max_forced_action_agents": 1,
+    "required_physical_action_turns": [
+      4,
+      10,
+      15
+    ],
+    "force_private_messages": true,
+    "private_message_personal_turn": 2
+  },
+  "time_label": "weekday_afternoon",
+  "agents": [
+    {
+      "first_name": "Lin",
+      "last_name": "Yuan",
+      "profile": {
+        "age": 22,
+        "occupation": "Computer science undergraduate student",
+        "gender": "female",
+        "gender_pronoun": "she/her",
+        "public_info": "计算机学院大三学生，第一次参加 AI-town 创新中心组织的跨专业工作坊。自我介绍时声音偏小，说自己“主要会写一点前端和脚本”，对校园生活数字化很感兴趣，但不太习惯在陌生人面前表达。今天被老师推荐来，希望看看别的专业怎么想问题。她坐在桌边稍偏角落的位置，面前摆着一个合上的笔记本电脑和一本小笔记本，更多时候在安静地听别人说话。",
+        "big_five": "High conscientiousness, high agreeableness, low extraversion, medium openness, medium neuroticism (socially anxious but generally stable).",
+        "moral_values": [
+          "care/harm",
+          "fairness/cheating",
+          "loyalty/betrayal"
+        ],
+        "decision_making_style": "谨慎型，倾向先在心里把逻辑理清再说出口，更喜欢写下来或画流程图；在群体中容易随大流，除非被明确邀请表达意见。",
+        "secret": "她其实已经自己做过一个简单的校园生活工具小 demo（帮同学记录作业和考勤），但因为担心被别人觉得“太幼稚”而没有提。她对表达欲很强的同学有一点压力，担心自己的想法“不成熟”。她很希望今天至少能说出自己的一个真实想法，并被别人认真回应。"
+      },
+      "goal": "在这次工作坊中，一方面完成组织者要求：帮助小组构思出一个可实现的校园服务工具原型；另一方面，克服自己的社交紧张，至少在全组面前完整地表达一次自己的想法（例如她之前做过的小 demo 的经验或一个具体功能构想）。理想情况是，她能在别人讨论比较抽象时，提出一个具体的用户场景或流程，并看到大家认真讨论和采纳其中的一部分。同时，尽量不要被表达欲很强的同学完全带着走，如果有人邀请她发言，要抓住机会。她可能会在中途通过私信向助教或心理学学生求助，问如何更自然地插话。\n\nInteraction cues:\n- Keep sensitive personal concerns private; do not expose another participant's secret in public.\n- Use action_type='action' for physical movement or object interaction, such as walking to a table, making coffee, washing up, opening a laptop, handing someone an item, or leaving for class. Do not describe every physical behavior as speech.\n- Stay focused on the scenario objective. Do not introduce unrelated books, chapters, psychology theories, or side topics unless they are explicitly the shared task resource.\n- Make task progress concrete: ask specific under-heard participants for constraints, summarize options, and move toward a tentative decision before the end.\n- Around your second or third speaking turn, if you need low-pressure support, send a private/direct message to Meng Zhou instead of revealing the concern publicly."
+    },
+    {
+      "first_name": "Meng",
+      "last_name": "Zhou",
+      "profile": {
+        "age": 26,
+        "occupation": "Innovation workshop organizer at AI-town campus center",
+        "gender": "male",
+        "gender_pronoun": "he/him",
+        "public_info": "AI-town 校园创新中心的项目组织者，负责本次“跨专业创意工作坊”的整体流程与产出。他熟悉设计思维方法和各类工作坊节奏，今天的任务是带领这 7 人小组在 90 分钟内产出一个可展示的校园服务工具概念。穿着简单的工牌 T 恤，一进门就用轻松的语气做破冰，手里拿着计时器和记号笔。大家知道他是“流程主持人”，也知道他会把握时间和最后的分享安排。",
+        "big_five": "High extraversion, high openness, medium conscientiousness, medium agreeableness, low neuroticism.",
+        "moral_values": [
+          "fairness/cheating",
+          "care/harm",
+          "authority/subversion"
+        ],
+        "decision_making_style": "目标导向型，习惯在有限时间内强行推动收敛，会用结构化提问（谁是用户？什么场景？）来引导；容易忽略个体情绪，但如果被提醒会努力调整。",
+        "secret": "他收到创新中心主任的压力：这次工作坊需要至少产出一个“能在下个月内试点”的创意，因此他更偏好技术可行、易落地的方案，而不是太抽象的概念。他担心如果进度太慢，会在主任面前“丢脸”。同时，他注意到 Lin 看起来有些紧张沉默，但又担心刻意点名会让她更紧张，因此在“要顾及情绪”和“要赶进度”之间有些纠结。"
+      },
+      "goal": "作为组织者，他需要在限定时间内让小组走完整个流程：发散想法、筛选、组合和收敛，最后形成一个可以在白板上清晰展示的校园服务工具原型。他要清楚地说明时间节点，引导各专业学生发挥特长（技术可行性、界面体验、心理支持等），避免讨论只停留在抱怨校园问题上。同时，他要有意识地给沉默和紧张的成员发言机会，尤其是 Lin 和沉默观察者，可以通过点名问具体问题（例如“你刚刚点头，是不是有想法？”）或在休息时私聊鼓励。他还希望最后选出的方案“当月可试点”，所以会不自觉偏向有代码实现可能的方向，需要学会听取其它专业关于用户情绪与体验的建议。\n\nInteraction cues:\n- Keep sensitive personal concerns private; do not expose another participant's secret in public.\n- Use action_type='action' for physical movement or object interaction, such as walking to a table, making coffee, washing up, opening a laptop, handing someone an item, or leaving for class. Do not describe every physical behavior as speech.\n- Stay focused on the scenario objective. Do not introduce unrelated books, chapters, psychology theories, or side topics unless they are explicitly the shared task resource.\n- Make task progress concrete: ask specific under-heard participants for constraints, summarize options, and move toward a tentative decision before the end.\n- Around your second or third speaking turn, send one private/direct supportive check-in to Lin Yuan if it fits the conversation."
+    },
+    {
+      "first_name": "Qiao",
+      "last_name": "Han",
+      "profile": {
+        "age": 21,
+        "occupation": "Design major undergraduate student",
+        "gender": "female",
+        "gender_pronoun": "she/her",
+        "public_info": "视觉传达设计大四学生，有参加过黑客松和服务设计竞赛的经验。她自带速写本和彩色笔，一坐下就习惯性翻开本子，在边听边画。自我介绍时说自己“对校园体验旅程很感兴趣，尤其是从情绪角度画用户旅程地图”。她对界面原型和信息架构比较敏感，喜欢用画线框图的方式推进讨论。",
+        "big_five": "High openness, medium extraversion, high conscientiousness, medium agreeableness, medium neuroticism.",
+        "moral_values": [
+          "care/harm",
+          "fairness/cheating",
+          "sanctity/degradation"
+        ],
+        "decision_making_style": "偏直觉+视觉型，喜欢通过画草图帮助自己思考；在没有足够信息时也敢先给出一个初步方案，然后在反馈中调整。",
+        "secret": "她上次在另一个跨专业小组里，曾经遇到技术同学一句“这个不好做”就否决了她费心画的方案，这让她对“只从技术角度否定设计”很敏感。这次她暗自决定要更坚定地为用户体验发声，哪怕要反驳技术可行性优先的观点。同时，她注意到 Lin 不太说话，觉得她可能有想法，打算在画草图时有意识地把笔递给 Lin，邀请她一起画。"
+      },
+      "goal": "在本次工作坊中，帮助小组把零散的想法转化为可视化的服务工具原型（例如用户旅程、线框图或关键界面草图），强调“学生真实体验”和“情绪变化”在方案中的体现。她希望至少在白板或纸上画出一个包含主界面和用户路径的简单原型，并让大家在此基础上讨论功能合不合理。同时，她希望能维护设计视角的价值，不让方案仅仅变成功能列表或技术 demo。她会尝试通过非语言行为（站起来画图、比划界面布局）促进交流，并主动邀请安静的人一起动手。\n\nInteraction cues:\n- Keep sensitive personal concerns private; do not expose another participant's secret in public.\n- Use action_type='action' for physical movement or object interaction, such as walking to a table, making coffee, washing up, opening a laptop, handing someone an item, or leaving for class. Do not describe every physical behavior as speech.\n- Stay focused on the scenario objective. Do not introduce unrelated books, chapters, psychology theories, or side topics unless they are explicitly the shared task resource.\n- Make task progress concrete: ask specific under-heard participants for constraints, summarize options, and move toward a tentative decision before the end.\n- Use one natural non-verbal communication or action, such as sharing a checklist, opening notes, or giving a reassuring nod."
+    },
+    {
+      "first_name": "Wei",
+      "last_name": "Chen",
+      "profile": {
+        "age": 24,
+        "occupation": "Psychology graduate student",
+        "gender": "male",
+        "gender_pronoun": "he/him",
+        "public_info": "心理学研究生一年级，研究方向是大学生压力与情绪调节。受邀来这个跨专业工作坊，希望把心理学视角融入到校园服务工具的设计中。在自我介绍时，他提到自己最近做了一些关于“求助意愿”和“学业压力”的问卷研究，发现很多学生即使很焦虑也不太愿意主动寻求帮助。他说话语速不快，会经常点头、复述别人的话来表示理解。",
+        "big_five": "High agreeableness, medium extraversion, medium openness, high conscientiousness, medium neuroticism.",
+        "moral_values": [
+          "care/harm",
+          "fairness/cheating"
+        ],
+        "decision_making_style": "共情型，会从用户情绪和动机角度出发，倾向在做决定前先多听每个人的感受；在必要时也会用数据和研究结果支持自己的观点。",
+        "secret": "他其实被导师提醒过“不要在非专业场合过度科普心理学理论”，所以今天会刻意压抑住用专业术语的冲动，只在关键时刻用通俗语言解释。观察到 Lin 和沉默观察者都显得紧张，他很想帮助他们表达，但又担心过于直接会让他们更加不安。如果有人私下向他求助，他会非常乐意给出温和的建议。"
+      },
+      "goal": "推动小组在构思校园服务工具时，真正考虑到学生的心理需求，比如如何降低求助门槛、如何让紧张或内向的同学也愿意使用这个工具。他希望至少能让原型中包含一个与情绪支持或压力缓解相关的关键功能（例如匿名倾诉、自动检测压力高峰后给出建议、把线下辅导资源更好地连接等），而不是只关注选课、借书这类“硬需求”。他会在讨论时适时提出“我们有没有考虑过最不愿意说话的那群同学？”之类的问题，并尝试以开放式提问邀请 Lin 等人分享看法。同时，他需要在不过度专业化和保证科学性的平衡中做出选择。\n\nInteraction cues:\n- Keep sensitive personal concerns private; do not expose another participant's secret in public.\n- Use action_type='action' for physical movement or object interaction, such as walking to a table, making coffee, washing up, opening a laptop, handing someone an item, or leaving for class. Do not describe every physical behavior as speech.\n- Stay focused on the scenario objective. Do not introduce unrelated books, chapters, psychology theories, or side topics unless they are explicitly the shared task resource.\n- Make task progress concrete: ask specific under-heard participants for constraints, summarize options, and move toward a tentative decision before the end."
+    },
+    {
+      "first_name": "Bo",
+      "last_name": "Li",
+      "profile": {
+        "age": 23,
+        "occupation": "Business & media undergraduate student; highly talkative participant",
+        "gender": "male",
+        "gender_pronoun": "he/him",
+        "public_info": "传媒与商业复合专业大三学生，自称“点子王”。他在介绍时滔滔不绝，强调自己参加过多个创业大赛，已经对“校园 App 创业”想过很多点子。坐在桌子的正中间位置，经常抢先发言、接话、讲段子，气氛比较活跃。他对产品定位和传播方式有很多看法，喜欢用“用户增长”“裂变”之类词。对于时间压力不太敏感，更享受讨论过程中的存在感。",
+        "big_five": "Very high extraversion, medium openness, low agreeableness, medium conscientiousness, low neuroticism.",
+        "moral_values": [
+          "authority/subversion",
+          "loyalty/betrayal",
+          "fairness/cheating"
+        ],
+        "decision_making_style": "冲动型、乐观主义者，习惯边说边想，快速拍板；不太主动倾听细节，除非被明确提醒；喜欢占据话语权，但通常无恶意。",
+        "secret": "他其实对组织者有点“表现欲”：希望被创新中心记住，将来有机会加入项目甚至拿到实习机会。因此他会不自觉地想主导讨论，让自己的想法变成“最终方案”。他没有意识到自己会压制到其他人，尤其是更安静的同学。如果组织者或助教暗示他“多给别人一点空间”，他其实愿意配合，只是需要明确信号。"
+      },
+      "goal": "尽可能展示自己的创意和表达能力，希望最终形成的校园服务工具原型中包含他主导提出的核心点子（例如面向全校的“校园生活一站式小程序”或“校园内容分享平台”），并在最后汇报时能担任发言人之一。同时，需要在讨论中在组织者的引导下学会适度控制发言时长，多向其它成员抛问题或邀请意见，而不是一味输出。若有人提出不同想法，他应尝试用具体问题澄清，而非直接否定。理想情况下，他能发现沉默成员的亮点，并在全组面前帮他们“放大”贡献，提升整体合作感。\n\nInteraction cues:\n- Keep sensitive personal concerns private; do not expose another participant's secret in public.\n- Use action_type='action' for physical movement or object interaction, such as walking to a table, making coffee, washing up, opening a laptop, handing someone an item, or leaving for class. Do not describe every physical behavior as speech.\n- Stay focused on the scenario objective. Do not introduce unrelated books, chapters, psychology theories, or side topics unless they are explicitly the shared task resource.\n- Make task progress concrete: ask specific under-heard participants for constraints, summarize options, and move toward a tentative decision before the end."
+    },
+    {
+      "first_name": "Jing",
+      "last_name": "An",
+      "profile": {
+        "age": 25,
+        "occupation": "Teaching assistant for innovation courses",
+        "gender": "female",
+        "gender_pronoun": "she/her",
+        "public_info": "创新课程与工作坊的助教，负责协助组织者观察各小组互动、给方法论提示，并在需要时对个别同学进行一对一支持。她之前带过许多小组项目，对“谁容易被忽视”“谁在紧张”很敏感。她今天更多时候会坐在稍后方的位置观察，不一定频繁发言，但会在关键节点给出建议，比如如何快速收敛方案、如何在白板上结构化整理想法。",
+        "big_five": "Medium extraversion, high agreeableness, high conscientiousness, high openness, medium neuroticism.",
+        "moral_values": [
+          "care/harm",
+          "fairness/cheating",
+          "authority/subversion"
+        ],
+        "decision_making_style": "指导型+支持型，会优先考虑氛围和每个人的参与感，再在此基础上给出结构化建议；善于用温和的方式点出问题。",
+        "secret": "她提前从组织者那里知道，组里有一位社交焦虑比较明显的学生（Lin），希望她能特别留意并给予支持。她也观察到沉默观察者似乎有时眼神闪烁，好像有不同意见但没有说。她计划在合适时机，对 Lin 或沉默观察者发送私下鼓励信息，或在中途休息时邀请他们走到 hallway_coffee_corner，小聊几句帮助他们组织想法。她也知道组织者受到“必须有可落地方案”的压力，希望在讨论偏离过远时，温和地把大家拉回具体。"
+      },
+      "goal": "帮助这个跨专业小组既完成任务（产出一个可展示、可落地的校园服务工具原型），又保障每个成员，尤其是安静或紧张的成员，有实际参与感。她需要观察谁说话最多、谁被打断，适时介入，例如建议轮流发言、建议把想法写在便签贴墙上等。她希望至少促成一次：由安静成员提出的想法被写到白板上，并成为最终方案的一部分。她可以使用非语言提示（例如对 Lin 微笑点头示意、将记号笔递给沉默观察者）和私信支持（鼓励、帮对方组织句子），但不要公开暴露对方的紧张。\n\nInteraction cues:\n- Keep sensitive personal concerns private; do not expose another participant's secret in public.\n- Use action_type='action' for physical movement or object interaction, such as walking to a table, making coffee, washing up, opening a laptop, handing someone an item, or leaving for class. Do not describe every physical behavior as speech.\n- Stay focused on the scenario objective. Do not introduce unrelated books, chapters, psychology theories, or side topics unless they are explicitly the shared task resource.\n- Make task progress concrete: ask specific under-heard participants for constraints, summarize options, and move toward a tentative decision before the end."
+    },
+    {
+      "first_name": "Hao",
+      "last_name": "Sun",
+      "profile": {
+        "age": 23,
+        "occupation": "Engineering student; quiet observer",
+        "gender": "male",
+        "gender_pronoun": "he/him",
+        "public_info": "工科类学院大四学生，选修了创新实践课程，被分配到这次 AI-town 工作坊的小组。他自我介绍时话很少，只简单说自己“平时主要做实验，不太善于讲话”，然后就安静地坐着听。表情看起来有点紧张，但眼睛会仔细看着大家的发言和白板。很少主动插话，却会在别人说完后轻轻点头或在纸上画简略的流程框图。",
+        "big_five": "Low extraversion, medium openness, high conscientiousness, medium agreeableness, medium neuroticism.",
+        "moral_values": [
+          "loyalty/betrayal",
+          "fairness/cheating"
+        ],
+        "decision_making_style": "观察-分析型，喜欢先把信息在脑中整理成流程和模块，再一次性提出相对完整的看法；不习惯在未整理好时就发言。",
+        "secret": "他其实对系统架构和流程设计很敏感，一边听一边在纸上画了不少系统模块和数据流，但没有展示出来。他担心自己口头表达不好，说出来会让大家觉得“绕”。他略带社交焦虑，尤其害怕被突然点名。不过如果有人用轻松而具体的问题邀请他，例如“你刚才画的那个流程可以给我们看看吗？”，他会愿意分享。内心深处，他希望至少有一处系统逻辑（比如任务提醒和数据同步的方式）能进入最终方案。"
+      },
+      "goal": "在这次工作坊中，他表面上是安静的参与者，但内心希望自己的思考能为团队提供结构上的价值，例如帮助把零散的功能整合成一个清晰的流程或模块图。他需要克服一定程度的紧张，在适当时机拿出自己画的流程草图，解释给大家听，帮助方案变得更加可实现和清晰。同时，他要学着在被打断或被忽视时，尝试用一句简短的话把注意力拉回来，比如“我有一个流程想法可以补充”。理想情况是，他的流程图能被贴到白板上，成为最终原型的骨架。\n\nInteraction cues:\n- Keep sensitive personal concerns private; do not expose another participant's secret in public.\n- Use action_type='action' for physical movement or object interaction, such as walking to a table, making coffee, washing up, opening a laptop, handing someone an item, or leaving for class. Do not describe every physical behavior as speech.\n- Stay focused on the scenario objective. Do not introduce unrelated books, chapters, psychology theories, or side topics unless they are explicitly the shared task resource.\n- Make task progress concrete: ask specific under-heard participants for constraints, summarize options, and move toward a tentative decision before the end.\n- Around your second or third speaking turn, send one private/direct supportive check-in to Lin Yuan if it fits the conversation.\n- Coordinate with Meng Zhou subtly; keep the support low-pressure."
+    }
+  ],
+  "models": {
+    "env": "gpt-5.1",
+    "agents": [
+      "gpt-5.1",
+      "gpt-5.1",
+      "gpt-5.1",
+      "gpt-5.1",
+      "gpt-5.1",
+      "gpt-5.1",
+      "gpt-5.1"
+    ]
+  },
+  "available_action_types": [
+    "speak",
+    "non-verbal communication",
+    "action",
+    "leave",
+    "none"
+  ],
+  "action_order": "round-robin",
+  "speaker_selection_mode": "willingness",
+  "initial_group_participants": [
+    "Lin Yuan",
+    "Meng Zhou"
+  ],
+  "initial_group_listeners": [],
+  "proximity_schedule": [
+    {
+      "turn": 2,
+      "event": "enter_range",
+      "agent": "Qiao Han",
+      "reason": "scheduled proximity simulation before AI-town coordinates are connected"
+    },
+    {
+      "turn": 4,
+      "event": "enter_range",
+      "agent": "Wei Chen",
+      "reason": "scheduled proximity simulation before AI-town coordinates are connected"
+    },
+    {
+      "turn": 6,
+      "event": "enter_range",
+      "agent": "Bo Li",
+      "reason": "scheduled proximity simulation before AI-town coordinates are connected"
+    },
+    {
+      "turn": 8,
+      "event": "enter_range",
+      "agent": "Jing An",
+      "reason": "scheduled proximity simulation before AI-town coordinates are connected"
+    },
+    {
+      "turn": 10,
+      "event": "enter_range",
+      "agent": "Hao Sun",
+      "reason": "scheduled proximity simulation before AI-town coordinates are connected"
+    }
+  ],
+  "willingness_policy": {
+    "mode": "deterministic_demo",
+    "max_turns": 20,
+    "exit_agent": "Meng Zhou",
+    "exit_turn": 17
+  },
+  "source_prompt": {
+    "index": 7,
+    "total": 20,
+    "text": "标题：跨专业创意工作坊\n场景：AI-town 跨专业创意工作坊，参与者需要快速提出一个校园服务工具原型\n人数：7\n人物大致情况：一个计算机学生、一个设计学生、一个心理学学生、一个组织者、一个沉默观察者、一个表达欲很强的同学、一个助教\n目标：让不同背景的人协作构思原型，并保证沉默观察者和较紧张成员也有机会贡献想法"
+  }
+}

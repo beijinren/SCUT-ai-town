@@ -1,6 +1,11 @@
-// willingness 相关类型统一从 gmTypes 转发，避免在多个文件重复维护。
+// Re-export willingness-related types from gmTypes so downstream code has a
+// stable import path under convex/GM/willingness/.
 export type {
+  GMExternalWillingnessScore,
+  GMWillingnessConflict,
   GMWillingnessContext,
+  GMWillingnessExtensionRequest,
+  GMWillingnessExtensionResult,
   GMWillingnessFactor,
   GMWillingnessScore,
   GMWillingnessTriggerReason,

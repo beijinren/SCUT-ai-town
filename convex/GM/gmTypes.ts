@@ -236,6 +236,20 @@ export interface GMWillingnessFactor {
   reason: string;
 }
 
+/**
+ * External scores are expected to come from the teammate-owned agent-side
+ * willingness logic. GM consumes them and only handles trigger timing and
+ * rare conflict-extension hooks.
+ */
+export interface GMExternalWillingnessScore {
+  agentId: string;
+  score: number;
+  reason?: string;
+  factors?: GMWillingnessFactor[];
+  canSpeak?: boolean;
+  source?: 'agent_self_score' | 'gm_internal_estimate' | 'manual';
+}
+
 export type GMWillingnessTriggerReason =
   | 'first_round'
   | 'new_participant_joined'
@@ -255,10 +269,32 @@ export interface GMWillingnessScore {
   canSpeak: boolean;
 }
 
+export interface GMWillingnessConflict {
+  type: 'score_tie' | 'ranking_conflict';
+  agentIds: string[];
+  reason: string;
+}
+
+export interface GMWillingnessExtensionRequest {
+  conversationId: string;
+  triggerReason: GMWillingnessTriggerReason;
+  ranking: GMWillingnessScore[];
+  conflict: GMWillingnessConflict;
+}
+
+export interface GMWillingnessExtensionResult {
+  shouldAdjust: boolean;
+  adjustedAgentOrder?: string[];
+  reason?: string;
+}
+
 export interface GMTurnOrderResult {
   ranking: GMWillingnessScore[];
   selectedNextSpeaker?: string;
   triggerReason: GMWillingnessTriggerReason;
+  usedExternalScores?: boolean;
+  needsGMReview?: boolean;
+  conflict?: GMWillingnessConflict;
 }
 
 export interface GMWillingnessContext {
