@@ -1,6 +1,4 @@
-import { api } from "../_generated/api";
 import { ActionCtx } from "../_generated/server";
-import type { ConnectionProfileState } from "../agent/connectionProfiles";
 
 // That's right! No imports and no dependencies 🤯
 
@@ -242,55 +240,6 @@ export function getLLMConfig(): LLMConfig {
   };
 }
 
-function normalizeCompatibleBaseUrl(url: string) {
-  return url.trim().replace(/\/$/, "");
-}
-
-function llmConfigFromProfileState(state: ConnectionProfileState): LLMConfig {
-  const activeProfile =
-    state.profiles.find(
-      (profile) => profile.name === state.activeProfileName,
-    ) ?? state.profiles[0];
-  if (!activeProfile) {
-    return getLLMConfig();
-  }
-  const baseUrl = normalizeCompatibleBaseUrl(activeProfile.config.baseUrl);
-  return {
-    chat: {
-      provider: "custom",
-      url: baseUrl,
-      model: activeProfile.config.chatModel,
-      apiKey: activeProfile.config.apiKey || undefined,
-      stopWords: [],
-    },
-    embedding: {
-      provider: "custom",
-      url: baseUrl,
-      model: activeProfile.config.embeddingModel,
-      apiKey: activeProfile.config.apiKey || undefined,
-      stopWords: [],
-    },
-  };
-}
-
-async function getRuntimeLLMConfig(ctx?: ActionCtx): Promise<LLMConfig> {
-  if (!ctx) {
-    return getLLMConfig();
-  }
-  try {
-    const state = await ctx.runQuery(
-      api.agent.connectionProfiles.getConnectionState,
-      {},
-    );
-    if (state) {
-      return llmConfigFromProfileState(state);
-    }
-  } catch (error) {
-    console.warn("Falling back to env-based LLM config:", error);
-  }
-  return getLLMConfig();
-}
-
 // Overload for non-streaming
 export async function chatCompletion(
   ctx: ActionCtx,
@@ -333,14 +282,13 @@ export async function chatCompletion(
     model?: CreateChatCompletionRequest["model"];
   },
 ) {
-  const ctx = maybeBody ? (ctxOrBody as ActionCtx) : undefined;
   const body = (maybeBody ?? ctxOrBody) as Omit<
     CreateChatCompletionRequest,
     "model"
   > & {
     model?: CreateChatCompletionRequest["model"];
   };
-  const config = (await getRuntimeLLMConfig(ctx)).chat;
+  const config = getLLMConfig().chat;
   body.model = body.model ?? config.model;
   const stopWords = body.stop
     ? typeof body.stop === "string"
@@ -426,9 +374,7 @@ export async function fetchEmbeddingBatch(
   retries?: number;
   ms?: number;
 }>;
-export async function fetchEmbeddingBatch(
-  texts: string[],
-): Promise<{
+export async function fetchEmbeddingBatch(texts: string[]): Promise<{
   ollama: false | true;
   embeddings: number[][];
   usage?: number;
@@ -439,9 +385,8 @@ export async function fetchEmbeddingBatch(
   ctxOrTexts: ActionCtx | string[],
   maybeTexts?: string[],
 ) {
-  const ctx = maybeTexts ? (ctxOrTexts as ActionCtx) : undefined;
   const texts = (maybeTexts ?? ctxOrTexts) as string[];
-  const config = (await getRuntimeLLMConfig(ctx)).embedding;
+  const config = getLLMConfig().embedding;
   if (config.provider === "ollama") {
     return {
       ollama: true as const,
@@ -501,9 +446,7 @@ export async function fetchEmbedding(
   retries?: number;
   ms?: number;
 }>;
-export async function fetchEmbedding(
-  text: string,
-): Promise<{
+export async function fetchEmbedding(text: string): Promise<{
   embedding: number[];
   usage?: number;
   retries?: number;

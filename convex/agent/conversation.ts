@@ -2,11 +2,8 @@ import { v } from "convex/values";
 import { Id } from "../_generated/dataModel";
 import { ActionCtx, internalQuery } from "../_generated/server";
 import { LLMMessage, chatCompletion } from "../util/llm";
-import * as memory from "./memory";
 import { api, internal } from "../_generated/api";
-import * as embeddingsCache from "./embeddingsCache";
 import { GameId, conversationId, playerId } from "../aiTown/ids";
-import { NUM_MEMORIES_TO_SEARCH } from "../constants";
 
 const selfInternal = internal.agent.conversation;
 
@@ -20,45 +17,19 @@ export async function startConversationMessage(
 ): Promise<string> {
   const {
     player,
-    otherPlayer,
     otherPlayers,
     agent,
     otherAgents,
-    lastConversation,
   } = await ctx.runQuery(selfInternal.queryPromptData, {
     worldId,
     playerId,
     otherPlayerId,
     conversationId,
   });
-  const embedding = await embeddingsCache.fetch(
-    ctx,
-    `${player.name} is talking to ${otherPlayer.name}`,
-  );
-
-  const memories = await memory.searchMemories(
-    ctx,
-    player.id as GameId<"players">,
-    embedding,
-    Number(process.env.NUM_MEMORIES_TO_SEARCH) || NUM_MEMORIES_TO_SEARCH,
-  );
-
-  const memoryWithOtherPlayer = memories.find(
-    (m) =>
-      m.data.type === "conversation" &&
-      m.data.playerIds.includes(otherPlayerId),
-  );
   const prompt = [
     `You are ${player.name}, and you just started speaking in a conversation with ${participantNames(otherPlayers)}.`,
   ];
   prompt.push(...agentPrompts(otherPlayers, agent, otherAgents));
-  prompt.push(...previousConversationPrompt(otherPlayer, lastConversation));
-  prompt.push(...relatedMemoriesPrompt(memories));
-  if (memoryWithOtherPlayer) {
-    prompt.push(
-      `Be sure to include some detail or question about a previous conversation in your greeting.`,
-    );
-  }
   if (thought) {
     prompt.push(
       `Before responding, keep this internal thought in mind: ${thought}`,
@@ -100,7 +71,6 @@ export async function continueConversationMessage(
 ): Promise<string> {
   const {
     player,
-    otherPlayer,
     otherPlayers,
     conversation,
     agent,
@@ -113,22 +83,11 @@ export async function continueConversationMessage(
   });
   const now = Date.now();
   const started = new Date(conversation.created);
-  const embedding = await embeddingsCache.fetch(
-    ctx,
-    `What do you think about ${otherPlayer.name}?`,
-  );
-  const memories = await memory.searchMemories(
-    ctx,
-    player.id as GameId<"players">,
-    embedding,
-    3,
-  );
   const prompt = [
     `You are ${player.name}, and you're currently in a conversation with ${participantNames(otherPlayers)}.`,
     `The conversation started at ${started.toLocaleString()}. It's now ${now.toLocaleString()}.`,
   ];
   prompt.push(...agentPrompts(otherPlayers, agent, otherAgents));
-  prompt.push(...relatedMemoriesPrompt(memories));
   if (thought) {
     prompt.push(
       `Before responding, keep this internal thought in mind: ${thought}`,
@@ -247,36 +206,6 @@ function agentPrompts(
       prompt.push(
         `About ${otherPlayer.name}: another participant in the same conversation.`,
       );
-    }
-  }
-  return prompt;
-}
-
-function previousConversationPrompt(
-  otherPlayer: { name: string },
-  conversation: { created: number } | null,
-): string[] {
-  const prompt = [];
-  if (conversation) {
-    const prev = new Date(conversation.created);
-    const now = new Date();
-    prompt.push(
-      `Last time you chatted with ${
-        otherPlayer.name
-      } it was ${prev.toLocaleString()}. It's now ${now.toLocaleString()}.`,
-    );
-  }
-  return prompt;
-}
-
-function relatedMemoriesPrompt(memories: memory.Memory[]): string[] {
-  const prompt = [];
-  if (memories.length > 0) {
-    prompt.push(
-      `Here are some related memories in decreasing relevance order:`,
-    );
-    for (const memory of memories) {
-      prompt.push(" - " + memory.description);
     }
   }
   return prompt;
@@ -412,32 +341,6 @@ export const queryPromptData = internalQuery({
         name: participant.name,
       });
     }
-    const lastTogether = await ctx.db
-      .query("participatedTogether")
-      .withIndex("edge", (q) =>
-        q
-          .eq("worldId", args.worldId)
-          .eq("player1", args.playerId)
-          .eq("player2", args.otherPlayerId),
-      )
-      // Order by conversation end time descending.
-      .order("desc")
-      .first();
-
-    let lastConversation = null;
-    if (lastTogether) {
-      lastConversation = await ctx.db
-        .query("archivedConversations")
-        .withIndex("worldId", (q) =>
-          q.eq("worldId", args.worldId).eq("id", lastTogether.conversationId),
-        )
-        .first();
-      if (!lastConversation) {
-        throw new Error(
-          `Conversation ${lastTogether.conversationId} not found`,
-        );
-      }
-    }
     return {
       player: { name: playerDescription.name, ...player },
       otherPlayer: { name: otherPlayerDescription.name, ...otherPlayer },
@@ -449,7 +352,6 @@ export const queryPromptData = internalQuery({
         ...agent,
       },
       otherAgents,
-      lastConversation,
     };
   },
 });

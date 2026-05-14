@@ -209,22 +209,8 @@ export class Agent {
       });
       return;
     }
-    // Check to see if we have a conversation we need to remember.
+    // 当前不再保留跨场景对话记忆，结束后的待记忆标记直接清掉。
     if (this.toRemember) {
-      if (demoMode.disableAgentConversationMemory) {
-        delete this.toRemember;
-        return;
-      }
-      // Fire off the action to remember the conversation.
-      console.log(
-        `Agent ${this.id} remembering conversation ${this.toRemember}`,
-      );
-      this.startOperation(game, now, "agentRememberConversation", {
-        worldId: game.worldId,
-        playerId: this.playerId,
-        agentId: this.id,
-        conversationId: this.toRemember,
-      });
       delete this.toRemember;
       return;
     }

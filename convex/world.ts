@@ -257,6 +257,7 @@ export const sceneDebugViews = query({
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId))
       .collect();
     const playerNameById = new Map(playerDescriptions.map((description) => [description.playerId, description.name]));
+    const playerIdByName = new Map(playerDescriptions.map((description) => [description.name, description.playerId]));
     return {
       scene: {
         id: scene.id,
@@ -269,9 +270,10 @@ export const sceneDebugViews = query({
         pressureSource: scene.pressureSource,
         hiddenFacts: scene.facts.filter((fact) => fact.visibility === 'hidden'),
       },
-      views: scene.roles.map((role) =>
-        buildSceneViewForRole(scene, role.id),
-      ),
+      views: scene.roles.map((role) => ({
+        ...buildSceneViewForRole(scene, role.id),
+        playerId: playerIdByName.get(role.name) ?? null,
+      })),
       runtimeInteractionDecisions: world.agents
         .map((agent) => ({
           playerId: agent.playerId,
@@ -280,34 +282,5 @@ export const sceneDebugViews = query({
         }))
         .filter((item) => item.decision !== null),
     };
-  },
-});
-
-export const previousConversation = query({
-  args: {
-    worldId: v.id('worlds'),
-    playerId,
-  },
-  handler: async (ctx, args) => {
-    // Walk the player's history in descending order, looking for a nonempty
-    // conversation.
-    const members = ctx.db
-      .query('participatedTogether')
-      .withIndex('playerHistory', (q) => q.eq('worldId', args.worldId).eq('player1', args.playerId))
-      .order('desc');
-
-    for await (const member of members) {
-      const conversation = await ctx.db
-        .query('archivedConversations')
-        .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('id', member.conversationId))
-        .unique();
-      if (!conversation) {
-        throw new Error(`Invalid conversation ID: ${member.conversationId}`);
-      }
-      if (conversation.numMessages > 0) {
-        return conversation;
-      }
-    }
-    return null;
   },
 });

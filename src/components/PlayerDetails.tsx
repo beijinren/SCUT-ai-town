@@ -16,6 +16,7 @@ export default function PlayerDetails({
   game,
   playerId,
   setSelectedElement,
+  onCloseSelection,
   scrollViewRef,
 }: {
   worldId: Id<"worlds">;
@@ -23,6 +24,7 @@ export default function PlayerDetails({
   game: ServerGame;
   playerId?: GameId<"players">;
   setSelectedElement: SelectElement;
+  onCloseSelection: () => void;
   scrollViewRef: React.RefObject<HTMLDivElement>;
 }) {
   const humanTokenIdentifier = useQuery(api.world.userStatus, { worldId });
@@ -43,11 +45,6 @@ export default function PlayerDetails({
   const player = playerId && game.world.players.get(playerId);
   const playerConversation = player && game.world.playerConversation(player);
 
-  const previousConversation = useQuery(
-    api.world.previousConversation,
-    playerId ? { worldId, playerId } : "skip",
-  );
-
   const playerDescription = playerId && game.playerDescriptions.get(playerId);
 
   const startConversation = useSendInput(engineId, "startConversation");
@@ -56,11 +53,7 @@ export default function PlayerDetails({
   const leaveConversation = useSendInput(engineId, "leaveConversation");
 
   if (!playerId) {
-    return (
-      <div className="h-full text-xl flex text-center items-center p-4">
-        Click on an agent on the map to see chat history.
-      </div>
-    );
+    return null;
   }
   if (!player) {
     return null;
@@ -159,7 +152,7 @@ export default function PlayerDetails({
         </div>
         <a
           className="button text-white shadow-solid text-2xl cursor-pointer pointer-events-auto"
-          onClick={() => setSelectedElement(undefined)}
+          onClick={onCloseSelection}
         >
           <h2 className="h-full bg-clay-700">
             <img className="w-4 h-4 sm:w-5 sm:h-5" src={closeImg} />
@@ -319,23 +312,6 @@ export default function PlayerDetails({
             scrollViewRef={scrollViewRef}
           />
         )}
-      {!playerConversation && previousConversation && (
-        <>
-          <div className="box flex-grow">
-            <h2 className="bg-brown-700 text-lg text-center">
-              Previous conversation
-            </h2>
-          </div>
-          <Messages
-            worldId={worldId}
-            engineId={engineId}
-            inConversationWithMe={false}
-            conversation={{ kind: "archived", doc: previousConversation }}
-            humanPlayer={humanPlayer}
-            scrollViewRef={scrollViewRef}
-          />
-        </>
-      )}
     </>
   );
 }

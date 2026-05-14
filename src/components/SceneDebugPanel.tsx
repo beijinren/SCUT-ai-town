@@ -1,6 +1,7 @@
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
+import { GameId } from '../../convex/aiTown/ids';
 
 type FactRecord = {
   id: string;
@@ -14,6 +15,7 @@ type FactRecord = {
 };
 
 type DebugView = {
+  playerId: GameId<'players'> | null;
   sceneId: string;
   sceneType: string;
   title: string;
@@ -89,7 +91,13 @@ function VisibilityBadge({ visibility }: { visibility: string }) {
   );
 }
 
-export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
+export function SceneDebugPanel({
+  worldId,
+  onFocusPlayer,
+}: {
+  worldId: Id<'worlds'>;
+  onFocusPlayer: (playerId: GameId<'players'>) => void;
+}) {
   const worldApi = api.world as any;
   const debugPayload = useQuery(worldApi.sceneDebugViews, { worldId }) as DebugPayload | undefined;
   const runtimeSceneState = useQuery(worldApi.currentSceneState, { worldId }) as
@@ -184,9 +192,24 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
                   <p className="font-display text-lg">{view.role.name}</p>
                   <p className="text-brown-200">{view.role.identity}</p>
                 </div>
-                <div className="text-right text-brown-100">
-                  <p>{view.availablePermissions.length} 个当前权限</p>
-                  <p>{view.visibleFacts.length} 条可见事实</p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right text-brown-100">
+                    <p>{view.availablePermissions.length} 个当前权限</p>
+                    <p>{view.visibleFacts.length} 条可见事实</p>
+                  </div>
+                  {view.playerId && (
+                    <button
+                      type="button"
+                      className="button text-white shadow-solid text-xs cursor-pointer pointer-events-auto shrink-0"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onFocusPlayer(view.playerId as GameId<'players'>);
+                      }}
+                    >
+                      <span className="block h-full bg-clay-700 px-2 py-1">定位</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </summary>

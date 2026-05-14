@@ -204,7 +204,7 @@ export class Conversation {
       const agent = [...game.world.agents.values()].find((a) => a.playerId === playerId);
       if (agent) {
         agent.lastConversation = now;
-        agent.toRemember = this.id;
+        delete agent.toRemember;
       }
     }
     game.world.conversations.delete(this.id);
@@ -220,7 +220,7 @@ export class Conversation {
     const agent = [...game.world.agents.values()].find((a) => a.playerId === player.id);
     if (agent) {
       agent.lastConversation = now;
-      agent.toRemember = this.id;
+      delete agent.toRemember;
     }
     if (this.participants.size < 2) {
       this.stop(game, now);
