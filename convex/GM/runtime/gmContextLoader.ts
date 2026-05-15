@@ -29,6 +29,36 @@ interface GMDescriptionsSnapshot {
   worldMap?: {
     width: number;
     height: number;
+    sceneId?: string;
+    sceneName?: string;
+    zones?: Array<{
+      id: string;
+      name: string;
+      roomId: string;
+      tags?: string[];
+      socialMeaning?: string;
+      bounds?: {
+        minX: number;
+        minY: number;
+        maxX: number;
+        maxY: number;
+      };
+    }>;
+    objects?: Array<{
+      id: string;
+      name: string;
+      kind?: string;
+      x: number;
+      y: number;
+      roomId?: string;
+      zoneId?: string;
+      parentObjectId?: string;
+      interactive?: boolean;
+      blocking?: boolean;
+      tags?: string[];
+      affordances?: string[];
+      description?: string;
+    }>;
   } | null;
   playerDescriptions: Array<{
     playerId: string;
@@ -121,8 +151,9 @@ export function buildGMContextFromSnapshots(args: {
   messages: GMMessageSnapshot[];
 }): GMRuntimeContext {
   const scene = defaultSceneTemplate.definition.scene;
-  const sceneTitle = args.world.sceneState?.title ?? scene.title;
-  const sceneLocation = args.world.sceneState?.location ?? scene.location;
+  const worldMap = args.descriptions.worldMap;
+  const sceneTitle = args.world.sceneState?.title ?? worldMap?.sceneName ?? scene.title;
+  const sceneLocation = args.world.sceneState?.location ?? worldMap?.sceneName ?? scene.location;
   const playerDescriptionById = new Map(
     args.descriptions.playerDescriptions.map((description) => [description.playerId, description]),
   );
@@ -154,15 +185,17 @@ export function buildGMContextFromSnapshots(args: {
 
   const playerToAgentId = new Map(actors.map((actor) => [actor.playerId, actor.agentId]));
   const facts = buildFactKnowledgeMap(actorRoleByAgentId);
-  const zoneId = args.world.sceneState?.sceneId ?? scene.id;
-  const worldMap = args.descriptions.worldMap;
-
-  return normalizeGMContext({
-    worldId: args.worldId,
-    sceneId: zoneId,
-    sceneTitle,
-    actors,
-    zones: worldMap
+  const zoneId = args.world.sceneState?.sceneId ?? worldMap?.sceneId ?? scene.id;
+  const zones =
+    worldMap?.zones?.map((zone) => ({
+      id: zone.id,
+      name: zone.name,
+      roomId: zone.roomId,
+      tags: zone.tags,
+      socialMeaning: zone.socialMeaning,
+      bounds: zone.bounds,
+    })) ??
+    (worldMap
       ? [
           {
             id: zoneId,
@@ -176,8 +209,30 @@ export function buildGMContextFromSnapshots(args: {
             },
           },
         ]
-      : [],
-    objects: [],
+      : []);
+  const objects =
+    worldMap?.objects?.map((object) => ({
+      id: object.id,
+      name: object.name,
+      kind: object.kind,
+      position: { x: object.x, y: object.y },
+      roomId: object.roomId,
+      zoneId: object.zoneId,
+      interactive: object.interactive,
+      blocking: object.blocking,
+      parentObjectId: object.parentObjectId,
+      tags: object.tags,
+      affordances: object.affordances,
+      description: object.description,
+    })) ?? [];
+
+  return normalizeGMContext({
+    worldId: args.worldId,
+    sceneId: zoneId,
+    sceneTitle,
+    actors,
+    zones,
+    objects,
     facts,
     messages: args.messages.map((message) => ({
       id: message._id ?? `${message.author}-${message._creationTime ?? Date.now()}`,

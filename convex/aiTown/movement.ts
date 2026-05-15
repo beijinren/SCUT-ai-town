@@ -175,7 +175,7 @@ export function blockedWithPositions(position: Point, otherPositions: Point[], m
   if (position.x < 0 || position.y < 0 || position.x >= map.width || position.y >= map.height) {
     return 'out of bounds';
   }
-  for (const layer of map.objectTiles) {
+  for (const layer of map.collisionTiles) {
     if (layer[Math.floor(position.x)][Math.floor(position.y)] !== -1) {
       return 'world blocked';
     }

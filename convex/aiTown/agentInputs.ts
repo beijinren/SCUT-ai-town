@@ -8,6 +8,10 @@ import { point } from '../util/types';
 import { AgentDescription } from './agentDescription';
 import { Agent } from './agent';
 import { defaultSceneAgentDescriptions } from '../../data/scenes';
+import {
+  serializedSemanticActionCandidate,
+  serializedSemanticEnvironmentContext,
+} from './semanticEnvironment';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -53,6 +57,11 @@ export const agentInputs = {
               score: v.number(),
             }),
           ),
+          semanticContext: v.optional(v.object(serializedSemanticEnvironmentContext)),
+          semanticActionCandidates: v.optional(
+            v.array(v.object(serializedSemanticActionCandidate)),
+          ),
+          chosenSemanticAction: v.optional(v.object(serializedSemanticActionCandidate)),
         }),
       ),
     },

@@ -21,6 +21,8 @@ export interface GMZone {
   id: string;
   name: string;
   roomId: string;
+  tags?: string[];
+  socialMeaning?: string;
   center?: Point;
   radius?: number;
   bounds?: {
@@ -40,7 +42,11 @@ export interface GMSceneObject {
   zoneId?: string;
   aliases?: string[];
   interactive?: boolean;
+  blocking?: boolean;
   parentObjectId?: string;
+  tags?: string[];
+  affordances?: string[];
+  description?: string;
 }
 
 export interface GMSceneGraphNode {

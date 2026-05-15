@@ -30,6 +30,10 @@ import { demoMode } from "./demoMode";
 import { defaultConversationRules } from "./defaultConversationRules";
 import { buildConversationDecisionContext } from "./conversationDecisionContext";
 import { InteractionTargetCandidate } from "./interactionTiming";
+import {
+  serializedSemanticActionCandidate,
+  serializedSemanticEnvironmentContext,
+} from './semanticEnvironment';
 
 function getOtherConversationPlayers(
   game: Game,
@@ -125,6 +129,74 @@ export class Agent {
     summary: string;
     reasons: string[];
     topCandidateScores: { playerId: string; score: number }[];
+    semanticContext?: {
+      currentArea?: {
+        id: string;
+        name: string;
+        roomId: string;
+        tags: string[];
+        socialMeaning?: string;
+      };
+      nearbyObjects: Array<{
+        id: string;
+        name: string;
+        kind?: string;
+        x: number;
+        y: number;
+        distance: number;
+        roomId?: string;
+        zoneId?: string;
+        parentObjectId?: string;
+        interactive: boolean;
+        blocking: boolean;
+        tags: string[];
+        affordances: string[];
+        description?: string;
+      }>;
+      nearbyPlayers: Array<{
+        playerId: string;
+        distance: number;
+        currentAreaId?: string;
+        currentAreaName?: string;
+        sameArea: boolean;
+        sameRoom: boolean;
+        doingActivity: boolean;
+        activityDescription?: string;
+        nearbyObjectIds: string[];
+      }>;
+      candidatePlayerContexts: Array<{
+        playerId: string;
+        distance: number;
+        currentAreaId?: string;
+        currentAreaName?: string;
+        sameArea: boolean;
+        sameRoom: boolean;
+        doingActivity: boolean;
+        activityDescription?: string;
+        nearbyObjectIds: string[];
+      }>;
+      environmentHints: string[];
+    };
+    semanticActionCandidates?: Array<{
+      kind: 'approach_player' | 'move_to_object' | 'move_to_area' | 'wait';
+      label: string;
+      score: number;
+      reasons: string[];
+      targetPlayerId?: string;
+      targetObjectId?: string;
+      targetAreaId?: string;
+      destination?: { x: number; y: number };
+    }>;
+    chosenSemanticAction?: {
+      kind: 'approach_player' | 'move_to_object' | 'move_to_area' | 'wait';
+      label: string;
+      score: number;
+      reasons: string[];
+      targetPlayerId?: string;
+      targetObjectId?: string;
+      targetAreaId?: string;
+      destination?: { x: number; y: number };
+    };
   };
   inProgressOperation?: {
     name: string;
@@ -466,6 +538,11 @@ export const serializedAgent = {
           score: v.number(),
         }),
       ),
+      semanticContext: v.optional(v.object(serializedSemanticEnvironmentContext)),
+      semanticActionCandidates: v.optional(
+        v.array(v.object(serializedSemanticActionCandidate)),
+      ),
+      chosenSemanticAction: v.optional(v.object(serializedSemanticActionCandidate)),
     }),
   ),
   inProgressOperation: v.optional(

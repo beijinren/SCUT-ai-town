@@ -14,6 +14,7 @@ import { ServerGame } from '../hooks/serverGame.ts';
 export type SelectElement = (element?: { kind: 'player'; id: GameId<'players'> }) => void;
 
 const logged = new Set<string>();
+const PLAYER_RENDER_SCALE = 1.5;
 
 export const Player = ({
   game,
@@ -68,7 +69,7 @@ export const Player = ({
     <>
       <Character
         x={historicalLocation.x * tileDim + tileDim / 2}
-        y={historicalLocation.y * tileDim + tileDim / 2}
+        y={historicalLocation.y * tileDim + tileDim}
         orientation={orientationDegrees(historicalFacing)}
         isMoving={historicalLocation.speed > 0}
         isThinking={isThinking}
@@ -82,6 +83,7 @@ export const Player = ({
         textureUrl={character.textureUrl}
         spritesheetData={character.spritesheetData}
         speed={character.speed}
+        renderScale={PLAYER_RENDER_SCALE}
         onClick={() => {
           onClick({ kind: 'player', id: player.id });
         }}

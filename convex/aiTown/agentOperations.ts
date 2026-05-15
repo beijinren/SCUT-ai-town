@@ -24,10 +24,28 @@ import {
   InteractionTargetCandidate,
 } from "./interactionTiming";
 import {
+  buildSemanticActionCandidates,
+  buildSemanticEnvironmentContext,
+} from './semanticEnvironment';
+import {
   generateThought,
 } from "../agent/thoughtGenerator";
 
 const selfInternal = internal.agent.conversation;
+
+function uniquePlayersFromCandidates(
+  player: { id: string },
+  interactionCandidates: InteractionTargetCandidate[],
+) {
+  const byId = new Map<string, InteractionTargetCandidate['player']>();
+  for (const candidate of interactionCandidates) {
+    if (candidate.player.id === player.id) {
+      continue;
+    }
+    byId.set(candidate.player.id, candidate.player);
+  }
+  return [...byId.values()];
+}
 
 export const agentRememberConversation = internalAction({
   args: {
@@ -164,6 +182,19 @@ export const agentDoSomething = internalAction({
       })),
       ...args.joinableConversationTargets,
     ];
+    const knownPlayers = uniquePlayersFromCandidates(player, interactionCandidates);
+    const semanticContext = buildSemanticEnvironmentContext({
+      map,
+      player: args.player,
+      knownPlayers,
+    });
+    const semanticActionCandidates = buildSemanticActionCandidates({
+      map,
+      player: args.player,
+      knownPlayers,
+      interactionCandidates,
+      environmentContext: semanticContext,
+    });
     const decision = decideInteractionTiming({
       player: args.player,
       interactionCandidates,
@@ -171,6 +202,8 @@ export const agentDoSomething = internalAction({
       justLeftConversation: Boolean(justLeftConversation),
       recentlyAttemptedInvite: Boolean(recentlyAttemptedInvite),
       doingActivity: Boolean(player.activity && player.activity.until > now),
+      semanticContext,
+      semanticActionCandidates,
     });
     const interactionDecision = {
       timestamp: now,
@@ -184,6 +217,9 @@ export const agentDoSomething = internalAction({
           playerId: candidate.playerId,
           score: candidate.score,
         })),
+      semanticContext,
+      semanticActionCandidates: semanticActionCandidates.slice(0, 5),
+      chosenSemanticAction: decision.chosenSemanticAction,
     };
     const invitee =
       demoMode.disableAgentConversations || !decision.shouldInitiate
@@ -193,7 +229,17 @@ export const agentDoSomething = internalAction({
     let destination;
     let activity;
     if (!invitee) {
+      const chosenSemanticAction = decision.chosenSemanticAction;
       if (
+        chosenSemanticAction &&
+        chosenSemanticAction.destination &&
+        (chosenSemanticAction.kind === 'move_to_object' ||
+          chosenSemanticAction.kind === 'move_to_area') &&
+        chosenSemanticAction.score >= 1.5 &&
+        !player.pathfinding
+      ) {
+        destination = chosenSemanticAction.destination;
+      } else if (
         !player.pathfinding &&
         (recentActivity || justLeftConversation || recentlyAttemptedInvite)
       ) {

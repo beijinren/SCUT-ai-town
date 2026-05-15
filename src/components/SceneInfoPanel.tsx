@@ -32,6 +32,21 @@ export function SceneInfoPanel({ worldId }: { worldId: Id<"worlds"> }) {
       }
     | null
     | undefined;
+  const gameDescriptions = useQuery(worldApi.gameDescriptions, {
+    worldId,
+  }) as
+    | {
+        worldMap?: {
+          sceneId?: string;
+          sceneName?: string;
+          originX?: number;
+          originY?: number;
+          zones?: unknown[];
+          objects?: unknown[];
+          markers?: unknown[];
+        };
+      }
+    | undefined;
 
   if (!infoPayload) {
     return (
@@ -44,6 +59,7 @@ export function SceneInfoPanel({ worldId }: { worldId: Id<"worlds"> }) {
   }
 
   const { scene } = infoPayload;
+  const worldMap = gameDescriptions?.worldMap;
 
   return (
     <div className="mt-6">
@@ -76,6 +92,23 @@ export function SceneInfoPanel({ worldId }: { worldId: Id<"worlds"> }) {
             <p>
               隐藏事实 ID：{runtimeSceneState.hiddenFactIds.join("、") || "无"}
             </p>
+          </div>
+        </div>
+      )}
+
+      {worldMap && (
+        <div className="desc mt-4">
+          <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-2">
+            <p className="font-display text-lg">当前地图语义</p>
+            <p>map.sceneId：{worldMap.sceneId || "无"}</p>
+            <p>map.sceneName：{worldMap.sceneName || "无"}</p>
+            <p>
+              origin：(
+              {worldMap.originX ?? "?"}, {worldMap.originY ?? "?"})
+            </p>
+            <p>zones：{worldMap.zones?.length ?? 0}</p>
+            <p>objects：{worldMap.objects?.length ?? 0}</p>
+            <p>markers：{worldMap.markers?.length ?? 0}</p>
           </div>
         </div>
       )}

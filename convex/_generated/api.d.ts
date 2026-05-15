@@ -88,6 +88,7 @@ import type * as aiTown_playerDescription from "../aiTown/playerDescription.js";
 import type * as aiTown_sceneProtocol from "../aiTown/sceneProtocol.js";
 import type * as aiTown_sceneTypes from "../aiTown/sceneTypes.js";
 import type * as aiTown_sceneVisibility from "../aiTown/sceneVisibility.js";
+import type * as aiTown_semanticEnvironment from "../aiTown/semanticEnvironment.js";
 import type * as aiTown_world from "../aiTown/world.js";
 import type * as aiTown_worldMap from "../aiTown/worldMap.js";
 import type * as constants from "../constants.js";
@@ -197,6 +198,7 @@ declare const fullApi: ApiFromModules<{
   "aiTown/sceneProtocol": typeof aiTown_sceneProtocol;
   "aiTown/sceneTypes": typeof aiTown_sceneTypes;
   "aiTown/sceneVisibility": typeof aiTown_sceneVisibility;
+  "aiTown/semanticEnvironment": typeof aiTown_semanticEnvironment;
   "aiTown/world": typeof aiTown_world;
   "aiTown/worldMap": typeof aiTown_worldMap;
   constants: typeof constants;

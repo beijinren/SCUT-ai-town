@@ -1,6 +1,10 @@
 import { distance } from '../util/geometry';
 import { SceneWorldSeed } from './sceneTypes';
 import { SerializedPlayer } from './player';
+import type {
+  SemanticActionCandidate,
+  SemanticEnvironmentContext,
+} from './semanticEnvironment';
 
 export interface InteractionTargetCandidate {
   player: SerializedPlayer;
@@ -32,6 +36,7 @@ export interface InteractionDecisionResult {
   threshold: number;
   reasons: InteractionDecisionReason[];
   candidateScores: InteractionCandidateScore[];
+  chosenSemanticAction?: SemanticActionCandidate;
 }
 
 function sceneEncouragesApproach(sceneState?: SceneWorldSeed) {
@@ -53,6 +58,7 @@ function scoreCandidate(
   player: SerializedPlayer,
   candidate: InteractionTargetCandidate,
   sceneState?: SceneWorldSeed,
+  semanticContext?: SemanticEnvironmentContext,
 ): InteractionCandidateScore {
   const candidateReasons: InteractionDecisionReason[] = [];
   let score = 0;
@@ -130,6 +136,49 @@ function scoreCandidate(
     }
   }
 
+  const semanticPlayerContext = semanticContext?.candidatePlayerContexts.find(
+    (context) => context.playerId === candidate.player.id,
+  );
+  if (semanticPlayerContext?.sameArea) {
+    score += 1.5;
+    candidateReasons.push({
+      code: 'same_semantic_area',
+      message: `目标与自己同处“${semanticPlayerContext.currentAreaName ?? '当前区域'}”，互动情境更连贯。`,
+      scoreDelta: 1.5,
+    });
+  } else if (semanticPlayerContext?.sameRoom) {
+    score += 0.75;
+    candidateReasons.push({
+      code: 'same_semantic_room',
+      message: '目标与自己处在同一语义房间，接触会更自然。',
+      scoreDelta: 0.75,
+    });
+  }
+
+  const sharedNearbyObjects = semanticPlayerContext?.nearbyObjectIds.filter((objectId) =>
+    semanticContext?.nearbyObjects.some((object) => object.id === objectId),
+  );
+  if (sharedNearbyObjects && sharedNearbyObjects.length > 0) {
+    const sharedObject = semanticContext?.nearbyObjects.find(
+      (object) => object.id === sharedNearbyObjects[0],
+    );
+    score += 1;
+    candidateReasons.push({
+      code: 'shared_nearby_object',
+      message: `双方都靠近“${sharedObject?.name ?? sharedNearbyObjects[0]}”，更容易找到自然话题。`,
+      scoreDelta: 1,
+    });
+  }
+
+  if (semanticContext?.currentArea?.socialMeaning) {
+    score += 0.4;
+    candidateReasons.push({
+      code: 'area_social_meaning',
+      message: `当前区域语义提示：${semanticContext.currentArea.socialMeaning}`,
+      scoreDelta: 0.4,
+    });
+  }
+
   return {
     playerId: candidate.player.id,
     score,
@@ -148,6 +197,8 @@ export function decideInteractionTiming(args: {
   justLeftConversation: boolean;
   recentlyAttemptedInvite: boolean;
   doingActivity: boolean;
+  semanticContext?: SemanticEnvironmentContext;
+  semanticActionCandidates?: SemanticActionCandidate[];
 }): InteractionDecisionResult {
   const {
     player,
@@ -156,6 +207,8 @@ export function decideInteractionTiming(args: {
     justLeftConversation,
     recentlyAttemptedInvite,
     doingActivity,
+    semanticContext,
+    semanticActionCandidates,
   } = args;
   const reasons: InteractionDecisionReason[] = [];
   const threshold = 2.5;
@@ -171,6 +224,7 @@ export function decideInteractionTiming(args: {
       threshold,
       reasons,
       candidateScores: [],
+      chosenSemanticAction: semanticActionCandidates?.[0],
     };
   }
 
@@ -185,6 +239,7 @@ export function decideInteractionTiming(args: {
       threshold,
       reasons,
       candidateScores: [],
+      chosenSemanticAction: semanticActionCandidates?.[0],
     };
   }
 
@@ -199,6 +254,7 @@ export function decideInteractionTiming(args: {
       threshold,
       reasons,
       candidateScores: [],
+      chosenSemanticAction: semanticActionCandidates?.[0],
     };
   }
 
@@ -213,14 +269,16 @@ export function decideInteractionTiming(args: {
       threshold,
       reasons,
       candidateScores: [],
+      chosenSemanticAction: semanticActionCandidates?.[0],
     };
   }
 
   const candidateScores = interactionCandidates
-    .map((candidate) => scoreCandidate(player, candidate, sceneState))
+    .map((candidate) => scoreCandidate(player, candidate, sceneState, semanticContext))
     .sort((a, b) => b.score - a.score);
 
   const bestCandidate = candidateScores[0];
+  const bestSemanticAction = semanticActionCandidates?.[0];
   reasons.push(
     ...bestCandidate.reasons,
     {
@@ -237,9 +295,16 @@ export function decideInteractionTiming(args: {
       threshold,
       reasons,
       candidateScores,
+      chosenSemanticAction: bestSemanticAction,
     };
   }
 
+  if (bestSemanticAction && bestSemanticAction.kind !== 'wait') {
+    reasons.push({
+      code: 'semantic_reposition',
+      message: `暂不直接搭话，但更适合先执行“${bestSemanticAction.label}”。`,
+    });
+  }
   reasons.push({
     code: 'below_threshold',
     message: `最佳候选对象得分低于阈值 ${threshold}，继续等待更合适时机。`,
@@ -250,5 +315,6 @@ export function decideInteractionTiming(args: {
     threshold,
     reasons,
     candidateScores,
+    chosenSemanticAction: bestSemanticAction,
   };
 }

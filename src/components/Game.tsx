@@ -92,12 +92,13 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     width={width}
                     height={height}
                     historicalTime={historicalTime}
-                    setSelectedElement={setSelectedElement}
-                    focusPlayerId={focusPlayerId}
-                    focusRequestId={focusRequestId}
-                  />
-                </ConvexProvider>
-              </Stage>
+                  setSelectedElement={setSelectedElement}
+                  focusPlayerId={focusPlayerId}
+                  focusRequestId={focusRequestId}
+                  semanticDebugPlayerId={selectedElement?.id}
+                />
+              </ConvexProvider>
+            </Stage>
             </div>
           </div>
         </div>

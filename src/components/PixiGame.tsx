@@ -15,6 +15,7 @@ import { DebugPath } from "./DebugPath.tsx";
 import { PositionIndicator } from "./PositionIndicator.tsx";
 import { SHOW_DEBUG_UI } from "./Game.tsx";
 import { ServerGame } from "../hooks/serverGame.ts";
+import { SemanticPerceptionOverlay } from './SemanticPerceptionOverlay.tsx';
 
 export const PixiGame = (props: {
   worldId: Id<"worlds">;
@@ -26,6 +27,7 @@ export const PixiGame = (props: {
   setSelectedElement: SelectElement;
   focusPlayerId?: GameId<"players">;
   focusRequestId?: number;
+  semanticDebugPlayerId?: GameId<'players'>;
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
@@ -86,6 +88,13 @@ export const PixiGame = (props: {
     );
   };
   const { width, height, tileDim } = props.game.worldMap;
+  const worldWidthPx = width * tileDim;
+  const worldHeightPx = height * tileDim;
+  const fitScale = Math.min(
+    props.width / Math.max(worldWidthPx, 1),
+    props.height / Math.max(worldHeightPx, 1),
+  );
+  const defaultViewportScale = Math.max(1.1, fitScale * 1.38);
   const players = [...props.game.world.players.values()];
 
   // Zoom on the user’s avatar when it is created
@@ -98,9 +107,9 @@ export const PixiGame = (props: {
         humanPlayer.position.x * tileDim,
         humanPlayer.position.y * tileDim,
       ),
-      scale: 1.5,
+      scale: defaultViewportScale,
     });
-  }, [humanPlayerId]);
+  }, [defaultViewportScale, humanPlayerId, props.game.world.players, tileDim]);
 
   useEffect(() => {
     if (!viewportRef.current || !props.focusPlayerId) {
@@ -115,17 +124,18 @@ export const PixiGame = (props: {
         focusPlayer.position.x * tileDim,
         focusPlayer.position.y * tileDim,
       ),
-      scale: 1.5,
+      scale: defaultViewportScale,
     });
-  }, [props.focusPlayerId, props.focusRequestId, props.game, tileDim]);
+  }, [defaultViewportScale, props.focusPlayerId, props.focusRequestId, props.game, tileDim]);
 
   return (
     <PixiViewport
       app={pixiApp}
       screenWidth={props.width}
       screenHeight={props.height}
-      worldWidth={width * tileDim}
-      worldHeight={height * tileDim}
+      worldWidth={worldWidthPx}
+      worldHeight={worldHeightPx}
+      initialScale={defaultViewportScale}
       viewportRef={viewportRef}
     >
       <PixiStaticMap
@@ -142,6 +152,12 @@ export const PixiGame = (props: {
       )}
       {lastDestination && (
         <PositionIndicator destination={lastDestination} tileDim={tileDim} />
+      )}
+      {(props.semanticDebugPlayerId ?? props.focusPlayerId) && (
+        <SemanticPerceptionOverlay
+          game={props.game}
+          playerId={props.semanticDebugPlayerId ?? props.focusPlayerId}
+        />
       )}
       {players.map((p) => (
         <Player

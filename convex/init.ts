@@ -1,13 +1,15 @@
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { DatabaseReader, MutationCtx, mutation } from './_generated/server';
-import * as map from '../data/gentle';
 import { defaultSceneAgentDescriptions, defaultSceneProtocol } from '../data/scenes';
 import { insertInput } from './aiTown/insertInput';
 import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { detectMismatchedLLMProvider } from './util/llm';
+import { DEFAULT_MAP_ID, getMapById } from '../data/maps/registry';
+
+const map = getMapById(DEFAULT_MAP_ID);
 
 const init = mutation({
   args: {
@@ -48,6 +50,7 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     .filter((q) => q.eq(q.field('isDefault'), true))
     .unique();
   if (worldStatus) {
+    await upsertWorldMap(ctx, worldStatus.worldId);
     const engine = (await ctx.db.get(worldStatus.engineId))!;
     return { worldStatus, engine };
   }
@@ -69,18 +72,7 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     worldId: worldId,
   });
   worldStatus = (await ctx.db.get(worldStatusId))!;
-  await ctx.db.insert('maps', {
-    worldId,
-    width: map.mapwidth,
-    height: map.mapheight,
-    tileSetUrl: map.tilesetpath,
-    tileSetDimX: map.tilesetpxw,
-    tileSetDimY: map.tilesetpxh,
-    tileDim: map.tiledim,
-    bgTiles: map.bgtiles,
-    objectTiles: map.objmap,
-    animatedSprites: map.animatedsprites,
-  });
+  await upsertWorldMap(ctx, worldId);
   await ctx.scheduler.runAfter(0, internal.aiTown.main.runStep, {
     worldId,
     generationNumber: engine.generationNumber,
@@ -112,4 +104,37 @@ async function shouldCreateAgents(
     return false;
   }
   return true;
+}
+
+async function upsertWorldMap(ctx: MutationCtx, worldId: Id<'worlds'>) {
+  const mapDoc = {
+    worldId,
+    width: map.mapwidth,
+    height: map.mapheight,
+    tileSetUrl: map.tilesetpath,
+    tileSetDimX: map.tilesetpxw,
+    tileSetDimY: map.tilesetpxh,
+    tileDim: map.tiledim,
+    bgTiles: map.bgtiles,
+    objectTiles: map.objmap,
+    collisionTiles: map.collisionmap ?? map.objmap,
+    animatedSprites: map.animatedsprites,
+    sceneId: map.sceneId,
+    sceneName: map.sceneName,
+    originX: map.originX,
+    originY: map.originY,
+    zones: map.zones,
+    objects: map.objects,
+    markers: map.markers,
+    tileRegistry: map.tileRegistry,
+  };
+  const existingMap = await ctx.db
+    .query('maps')
+    .withIndex('worldId', (q) => q.eq('worldId', worldId))
+    .unique();
+  if (existingMap) {
+    await ctx.db.replace(existingMap._id, mapDoc);
+    return;
+  }
+  await ctx.db.insert('maps', mapDoc);
 }

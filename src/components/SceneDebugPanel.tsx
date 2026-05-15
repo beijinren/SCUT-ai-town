@@ -60,6 +60,46 @@ type DebugPayload = {
       summary: string;
       reasons: string[];
       topCandidateScores: Array<{ playerId: string; score: number }>;
+      semanticContext?: {
+        currentArea?: {
+          id: string;
+          name: string;
+          roomId: string;
+          tags: string[];
+          socialMeaning?: string;
+        };
+        nearbyObjects: Array<{
+          id: string;
+          name: string;
+          kind?: string;
+          distance: number;
+          tags: string[];
+          affordances: string[];
+        }>;
+        nearbyPlayers: Array<{
+          playerId: string;
+          distance: number;
+          currentAreaName?: string;
+          sameArea: boolean;
+          sameRoom: boolean;
+          doingActivity: boolean;
+        }>;
+        environmentHints: string[];
+      };
+      semanticActionCandidates?: Array<{
+        kind: 'approach_player' | 'move_to_object' | 'move_to_area' | 'wait';
+        label: string;
+        score: number;
+        reasons: string[];
+        targetPlayerId?: string;
+        targetObjectId?: string;
+        targetAreaId?: string;
+      }>;
+      chosenSemanticAction?: {
+        kind: 'approach_player' | 'move_to_object' | 'move_to_area' | 'wait';
+        label: string;
+        score: number;
+      };
     } | null;
   }>;
 };
@@ -255,6 +295,9 @@ export function SceneDebugPanel({
       <div className="desc mt-4">
         <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-3">
           <p className="font-display text-lg">主动交互决策</p>
+          <p className="text-brown-200">
+            点击上面的“定位”或直接点击地图里的角色，可以在地图上看到该 agent 的感知叠层。
+          </p>
           {runtimeInteractionDecisions.length === 0 && (
             <p>当前还没有记录到新的主动交互决策。</p>
           )}
@@ -287,6 +330,98 @@ export function SceneDebugPanel({
                       </ul>
                     </div>
                   )}
+                  {item.decision.semanticContext && (
+                    <div className="mt-3 space-y-2">
+                      <p>语义环境：</p>
+                      {item.decision.semanticContext.currentArea ? (
+                        <div className="space-y-1">
+                          <p>
+                            当前区域：{item.decision.semanticContext.currentArea.name}
+                            {' / '}
+                            {item.decision.semanticContext.currentArea.roomId}
+                          </p>
+                          {item.decision.semanticContext.currentArea.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {item.decision.semanticContext.currentArea.tags.map((tag) => (
+                                <span
+                                  key={`${item.playerId}-area-tag-${tag}`}
+                                  className="inline-block rounded bg-clay-700 px-2 py-1 text-xs"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p>当前区域：未命中语义区域</p>
+                      )}
+                      {item.decision.semanticContext.nearbyObjects.length > 0 && (
+                        <div>
+                          <p>附近物品：</p>
+                          <ul className="list-disc pl-5 mt-1 space-y-1">
+                            {item.decision.semanticContext.nearbyObjects.map((object) => (
+                              <li key={`${item.playerId}-object-${object.id}`}>
+                                {object.name}（{object.distance.toFixed(1)} 格）
+                                {object.affordances.length > 0
+                                  ? `；affordance：${object.affordances.join('、')}`
+                                  : ''}
+                                {object.tags.length > 0 ? `；标签：${object.tags.join('、')}` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {item.decision.semanticContext.nearbyPlayers.length > 0 && (
+                        <div>
+                          <p>附近人物：</p>
+                          <ul className="list-disc pl-5 mt-1 space-y-1">
+                            {item.decision.semanticContext.nearbyPlayers.map((player) => (
+                              <li key={`${item.playerId}-nearby-${player.playerId}`}>
+                                {player.playerId}（{player.distance.toFixed(1)} 格）
+                                {player.sameArea ? '；同区域' : player.sameRoom ? '；同房间' : ''}
+                                {player.doingActivity ? '；进行中活动' : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {item.decision.semanticContext.environmentHints.length > 0 && (
+                        <div>
+                          <p>环境提示：</p>
+                          <ul className="list-disc pl-5 mt-1 space-y-1">
+                            {item.decision.semanticContext.environmentHints.map((hint, index) => (
+                              <li key={`${item.playerId}-hint-${index}`}>{hint}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {item.decision.semanticActionCandidates &&
+                    item.decision.semanticActionCandidates.length > 0 && (
+                      <div className="mt-3">
+                        <p>语义候选行为：</p>
+                        <ul className="list-disc pl-5 mt-1 space-y-2">
+                          {item.decision.semanticActionCandidates.map((candidate, index) => (
+                            <li key={`${item.playerId}-semantic-action-${index}`}>
+                              <div>
+                                {candidate.label}：{candidate.score.toFixed(1)}
+                                {item.decision?.chosenSemanticAction?.label === candidate.label &&
+                                  '（当前首选）'}
+                              </div>
+                              <ul className="list-disc pl-5 mt-1 space-y-1">
+                                {candidate.reasons.map((reason, reasonIndex) => (
+                                  <li key={`${item.playerId}-semantic-reason-${index}-${reasonIndex}`}>
+                                    {reason}
+                                  </li>
+                                ))}
+                              </ul>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                 </>
               ) : (
                 <p className="text-brown-200 mt-1">尚无决策记录。</p>

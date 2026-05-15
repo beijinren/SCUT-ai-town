@@ -14,6 +14,9 @@ export type ViewportProps = {
   screenHeight: number;
   worldWidth: number;
   worldHeight: number;
+  initialScale?: number;
+  minScale?: number;
+  maxScale?: number;
   children?: ReactNode;
 };
 
@@ -21,6 +24,13 @@ export type ViewportProps = {
 export default PixiComponent('Viewport', {
   create(props: ViewportProps) {
     const { app, children, viewportRef, ...viewportProps } = props;
+    const fitScale = Math.min(
+      props.screenWidth / Math.max(props.worldWidth, 1),
+      props.screenHeight / Math.max(props.worldHeight, 1),
+    );
+    const minScale = props.minScale ?? Math.max(0.5, fitScale * 0.75);
+    const initialScale = props.initialScale ?? Math.max(minScale, fitScale * 0.95);
+    const maxScale = props.maxScale ?? Math.max(3.0, fitScale * 2.5);
     const viewport = new Viewport({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       events: app.renderer.events,
@@ -37,10 +47,10 @@ export default PixiComponent('Viewport', {
       .wheel()
       .decelerate()
       .clamp({ direction: 'all', underflow: 'center' })
-      .setZoom(-10)
+      .setZoom(initialScale)
       .clampZoom({
-        minScale: (1.04 * props.screenWidth) / (props.worldWidth / 2),
-        maxScale: 3.0,
+        minScale,
+        maxScale,
       });
     return viewport;
   },

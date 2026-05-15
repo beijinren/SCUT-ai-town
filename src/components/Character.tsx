@@ -15,6 +15,7 @@ export const Character = ({
   emoji = '',
   isViewer = false,
   speed = 0.1,
+  renderScale = 1,
   onClick,
 }: {
   // Path to the texture packed image.
@@ -35,6 +36,7 @@ export const Character = ({
   isViewer?: boolean;
   // The speed of the animation. Can be tuned depending on the side and speed of the NPC.
   speed?: number;
+  renderScale?: number;
   onClick: () => void;
 }) => {
   const [spriteSheet, setSpriteSheet] = useState<Spritesheet>();
@@ -83,38 +85,51 @@ export const Character = ({
       break;
   }
 
+  const bubbleOffsetX = 18 * renderScale;
+  const bubbleOffsetY = -24 * renderScale;
+  const emojiOffsetY = -34 * renderScale;
+  const indicatorWidth = 20 * renderScale;
+  const indicatorHeight = 10 * renderScale;
+
   return (
     <Container x={x} y={y} interactive={true} pointerdown={onClick} cursor="pointer">
       {isThinking && (
         // TODO: We'll eventually have separate assets for thinking and speech animations.
-        <Text x={-20} y={-10} scale={{ x: -0.8, y: 0.8 }} text={'💭'} anchor={{ x: 0.5, y: 0.5 }} />
+        <Text
+          x={-bubbleOffsetX}
+          y={bubbleOffsetY}
+          scale={{ x: -0.8, y: 0.8 }}
+          text={'💭'}
+          anchor={{ x: 0.5, y: 0.5 }}
+        />
       )}
       {isSpeaking && (
         // TODO: We'll eventually have separate assets for thinking and speech animations.
-        <Text x={18} y={-10} scale={0.8} text={'💬'} anchor={{ x: 0.5, y: 0.5 }} />
+        <Text x={bubbleOffsetX} y={bubbleOffsetY} scale={0.8} text={'💬'} anchor={{ x: 0.5, y: 0.5 }} />
       )}
-      {isViewer && <ViewerIndicator />}
+      {isViewer && <ViewerIndicator width={indicatorWidth} height={indicatorHeight} />}
       <AnimatedSprite
         ref={ref}
         isPlaying={isMoving}
         textures={spriteSheet.animations[direction]}
         animationSpeed={speed}
-        anchor={{ x: 0.5, y: 0.5 }}
+        anchor={{ x: 0.5, y: 1 }}
+        scale={renderScale}
       />
       {emoji && (
-        <Text x={0} y={-24} scale={{ x: -0.8, y: 0.8 }} text={emoji} anchor={{ x: 0.5, y: 0.5 }} />
+        <Text x={0} y={emojiOffsetY} scale={{ x: -0.8, y: 0.8 }} text={emoji} anchor={{ x: 0.5, y: 0.5 }} />
       )}
     </Container>
   );
 };
 
-function ViewerIndicator() {
+function ViewerIndicator({ width, height }: { width: number; height: number }) {
   const draw = useCallback((g: PIXI.Graphics) => {
     g.clear();
     g.beginFill(0xffff0b, 0.5);
-    g.drawRoundedRect(-10, 10, 20, 10, 100);
+    g.drawRoundedRect(-width / 2, 10, width, height, 100);
     g.endFill();
-  }, []);
+  }, [height, width]);
 
   return <Graphics draw={draw} />;
 }
