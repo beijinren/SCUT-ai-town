@@ -1,12 +1,8 @@
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { DatabaseReader, MutationCtx, mutation } from './_generated/server';
-import * as map from '../data/gentle';
+import * as map from '../data/maps/interview_room/interviewRoomMap';
 import { defaultSceneAgentDescriptions, defaultSceneProtocol } from '../data/scenes';
-import {
-  createDemoSemanticAreas,
-  createDemoSemanticObjects,
-} from '../data/semantic/crossMajorWorkshopSemantic';
 import { insertInput } from './aiTown/insertInput';
 import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
@@ -73,7 +69,6 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     worldId: worldId,
   });
   worldStatus = (await ctx.db.get(worldStatusId))!;
-  const sceneId = defaultSceneProtocol.worldSeed.sceneId;
   await ctx.db.insert('maps', {
     worldId,
     width: map.mapwidth,
@@ -85,10 +80,10 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     bgTiles: map.bgtiles,
     objectTiles: map.objmap,
     animatedSprites: map.animatedsprites,
-    // Temporary real map semantics: stored in the maps table and read by the real agent loop.
-    // Replace only data/semantic/crossMajorWorkshopSemantic.ts when Unity exports final data.
-    semanticObjects: createDemoSemanticObjects(sceneId),
-    semanticAreas: createDemoSemanticAreas(sceneId),
+    // 语义数据和地图一起来自 data/maps/interview_room/interview_room.json。
+    // 主链路和 GM 都读取 maps 表中的同一份数据，避免出现两套空间理解。
+    semanticObjects: map.semanticObjects,
+    semanticAreas: map.semanticAreas,
   });
   await ctx.scheduler.runAfter(0, internal.aiTown.main.runStep, {
     worldId,

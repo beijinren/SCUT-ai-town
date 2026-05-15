@@ -1,158 +1,215 @@
-# 空间语义感知与主动交互说明
+# 空间语义感知与主链路接入说明
 
-这份文档解释本轮做了什么，以及它为什么是“真实接入主链路”，不是 GM 虚拟数据。
+这份文档用小白友好的方式说明：我们现在做了什么、真实地图放在哪里、主链路怎么用它、GM 怎么复用它。
 
-## 1. 这次解决什么问题
+## 1. 一句话说明
 
-原来的 agent 主动交互主要看：
+现在不是 GM 自己造一份“假空间数据”，而是把真实地图 JSON 里的语义区域和语义物品写入 `maps` 表。
 
-```text
-谁离我近
-我刚才有没有聊过
-对方是不是空闲
-当前场景氛围是否鼓励搭话
-```
-
-现在新增一层空间语义，让 agent 还可以理解：
+主链路和 GM 都读同一份数据：
 
 ```text
-我在哪个区域
-附近有什么物品
-这些物品适合做什么
-这个地点适不适合主动打扰别人
-我是不是应该先走到某个物品或区域附近
-```
-
-## 2. 这不是 GM mock，而是真实地图数据
-
-现在 `WorldMap` 增加了两个字段：
-
-```ts
-semanticObjects
-semanticAreas
-```
-
-它们会跟地图一起进入真实的 `maps` 表。
-
-也就是说真实链路是：
-
-```text
-convex/init.ts
+data/maps/interview_room/interview_room.json
+-> data/maps/interview_room/interviewRoomMap.ts
+-> convex/init.ts
 -> maps 表
--> WorldMap
--> agentDoSomething
--> semanticEnvironment
--> interactionTiming
--> finishDoSomething
--> movePlayer / Conversation.start
+-> WorldMap.semanticAreas / semanticObjects
 ```
 
-所以 agent 的真实行动会被这套语义判断影响。
+## 2. 地图文件放在哪里
 
-## 3. 临时语义数据放在哪里
-
-临时数据没有直接塞进 `convex/init.ts`。
-
-它被单独放在：
+真实地图包放在：
 
 ```text
-data/semantic/crossMajorWorkshopSemantic.ts
+data/maps/interview_room/
 ```
 
-`convex/init.ts` 只负责调用：
+里面有：
 
-```ts
-createDemoSemanticObjects(sceneId)
-createDemoSemanticAreas(sceneId)
+```text
+interview_room.json      地图导出的原始 JSON
+tileset.png              地图 tileset 源文件
+reference.jpg            参考图，给人看的
+interviewRoomMap.ts      把 JSON 转成 AI Town 原地图格式
+README.md                地图包说明
 ```
 
-这样以后 Unity 导出正式语义数据时，只需要替换这个数据来源，不需要在主链路文件里到处删 demo 配置。
+浏览器真正加载 tileset 时，需要从 `public/` 读取，所以还有一份：
 
-## 4. 新增的核心模块
+```text
+public/maps/interview_room/tileset.png
+```
 
-新增：
+## 3. 为什么要有 interviewRoomMap.ts
+
+AI Town 原来的地图格式类似：
+
+```text
+data/gentle.js
+-> bgtiles
+-> objmap
+-> tilesetpath
+-> mapwidth / mapheight
+```
+
+你给的新地图是 JSON，结构更丰富：
+
+```text
+bgLayers
+visualLayers
+collisionLayers
+zones
+objects
+markers
+```
+
+所以我们加了一个适配器：
+
+```text
+data/maps/interview_room/interviewRoomMap.ts
+```
+
+它做三件事：
+
+```text
+1. 把 JSON 图层转成 AI Town 能读的 bgtiles / objmap
+2. 把 zones 转成 semanticAreas
+3. 把 objects 转成 semanticObjects
+```
+
+注意：它只是“翻译格式”，不是新引擎。
+
+## 4. 主链路现在怎么跑
+
+主链路特点仍然不变：
+
+```text
+world 还是脚本生成
+agent 还是脚本生成
+UI 还是只读状态并显示
+movement / pathfinding / collision 仍然用原系统
+```
+
+现在 `convex/init.ts` 不再直接读 `data/gentle.js`，而是读：
+
+```text
+data/maps/interview_room/interviewRoomMap.ts
+```
+
+然后写入：
+
+```text
+maps.bgTiles
+maps.objectTiles
+maps.semanticAreas
+maps.semanticObjects
+```
+
+这样 agent 的真实行动循环就能拿到语义地图。
+
+## 5. 语义判断模块做什么
+
+新增核心文件：
 
 ```text
 convex/aiTown/semanticEnvironment.ts
 ```
 
-它负责三件事：
+它负责识别和打分，不负责移动。
+
+主要函数：
 
 ```text
-1. getEnvironmentContextForPlayer()
-   根据玩家坐标识别当前区域、附近物品、附近人物和环境提示。
-
-2. buildInteractionCandidates()
-   根据环境上下文生成候选行为。
-
-3. selectReachablePointNearObject() / selectReachablePointInArea()
-   给 move_to_object / move_to_area 选择可达点，避免走进阻挡格。
+getEnvironmentContextForPlayer()
 ```
 
-它不负责：
+根据 agent 当前坐标，判断：
 
 ```text
-不移动角色
-不发起对话
-不调用 LLM
-不生成坐标幻想
+它在哪个区域
+附近有什么物品
+附近有什么人
+这个环境有什么提示
 ```
-
-## 5. 主链路怎么使用它
-
-真实 agent 空闲时会触发：
 
 ```text
-Agent.tick()
--> agentDoSomething
+buildInteractionCandidates()
 ```
 
-现在 `agentDoSomething` 会额外做：
+根据环境生成候选行为：
 
 ```text
-1. 读取真实 WorldMap.semanticObjects / semanticAreas
-2. 计算 EnvironmentContext
-3. 生成 SemanticActionCandidate
-4. 交给 decideInteractionTiming()
-5. 根据最终选择执行原系统动作
+approach_player   靠近某个人
+move_to_object    走到某个物品附近
+move_to_area      走到某个区域
+wait              等待
 ```
 
-动作仍然复用旧系统：
+每个候选行为都有：
 
 ```text
-approach_player -> Conversation.start
-move_to_object -> movePlayer
-move_to_area -> movePlayer
-wait -> 不移动、不邀请
+score
+reasons
+destination（如果需要移动）
 ```
 
-## 6. GM 怎么复用
+## 6. interactionTiming 怎么用它
 
-GM 原来有：
+原来的主动交互判断主要看：
+
+```text
+距离
+冷却时间
+对方是否空闲
+场景是否鼓励主动交流
+```
+
+现在在这些规则上额外加空间语义：
+
+```text
+当前区域是否适合交流
+附近物品是否提供自然开场理由
+附近是否有低压力互动点
+目标是否正在忙
+是否更适合先移动到某个物品或区域
+```
+
+但最终动作还是交给原系统执行：
+
+```text
+approach_player -> 原来的发起会话逻辑
+move_to_object  -> 原来的移动逻辑
+move_to_area    -> 原来的移动逻辑
+wait            -> 不移动，不发起对话
+```
+
+## 7. GM 怎么复用
+
+GM 侧原来已经有：
 
 ```text
 convex/GM/spatial/
 ```
 
-现在 `gmContextLoader` 会从真实 `worldMap.semanticAreas / semanticObjects` 生成：
+现在 `gmContextLoader` 会从真实 `WorldMap` 读取：
+
+```text
+semanticAreas
+semanticObjects
+```
+
+并转换成 GM 内部的：
 
 ```text
 GMZone
 GMSceneObject
 ```
 
-所以 GM spatial 后续看到的不是固定 demo zone，而是真实地图语义数据。
+所以 GM 后续做 observation / perception / debug 时，看到的是同一份真实地图语义，不是另一套 mock。
 
-简单说：
+## 8. 调试面板能看到什么
 
-```text
-主链路用同一份语义数据做行动决策。
-GM 用同一份语义数据做旁路解释和 observation。
-```
-
-## 7. 调试面板能看到什么
-
-`SceneDebugPanel` 现在会显示：
+`SceneDebugPanel` 现在会显示主动交互决策里的空间语义信息：
 
 ```text
 当前区域
@@ -162,42 +219,49 @@ GM 用同一份语义数据做旁路解释和 observation。
 候选行为
 候选行为分数
 候选行为理由
-最终语义选择
+最终选择
 是否由空间语义触发
 ```
 
-这能解释 agent 为什么：
+这样你可以直接看出：
 
 ```text
-走向饮料桌
-靠近某个人
-移动到发布台附近
-选择等待
+为什么 agent 走向会议桌
+为什么 agent 靠近某个人
+为什么 agent 选择等待
+为什么某个物品改变了行为倾向
 ```
 
-## 8. 当前临时语义对象
+## 9. 当前最重要的边界
 
-目前为了先跑通识别判断，临时加入：
+这次没有做：
 
 ```text
-休息区
-发布台附近
-安静角落
-饮料桌
-沙发
-发布台
-安静角落展示板
+不让 LLM 直接输出坐标
+不重写 movement
+不重写 collision
+不重写 pathfinding
+不让 GM 接管主链路
+不把语义数据散落写进 init.ts
 ```
 
-这些数据只是早期替代 Unity 导出，格式会和未来正式字段保持一致。
-
-## 9. 最短总结
+这次做的是：
 
 ```text
-语义数据进真实 maps 表。
-主链路真实读取它。
-agentDoSomething 真实调用它。
-interactionTiming 真实用它改变决策。
-GM 也从同一份数据读取空间语义。
-临时数据单独放 data/semantic，后面好替换。
+真实地图 JSON 进入独立地图包
+地图适配器把 JSON 转成 AI Town 可读格式
+WorldMap 保存 semanticAreas / semanticObjects
+主链路根据语义生成候选行为
+GM 读取同一份真实语义数据做旁路解释
+```
+
+## 10. 最短总结
+
+```text
+地图库管地图。
+WorldMap 管真实地图状态。
+semanticEnvironment 管识别和候选行为评分。
+interactionTiming 管是否采用语义行为。
+agentOperations 管把选择交给原移动/对话系统执行。
+GM 只读同一份语义数据做解释和 debug。
 ```
