@@ -91,6 +91,10 @@ export class Agent {
       this.startOperation(game, now, 'agentDoSomething', {
         worldId: game.worldId,
         player: player.serialize(),
+        allPlayers: [...game.world.players.values()].map((p) => p.serialize()),
+        playersInConversation: [...game.world.conversations.values()].flatMap((conversation) => [
+          ...conversation.participants.keys(),
+        ]),
         otherFreePlayers: [...game.world.players.values()]
           .filter((p) => p.id !== player.id)
           .filter(
@@ -317,6 +321,10 @@ export const serializedAgent = {
           score: v.number(),
         }),
       ),
+      environmentContext: v.optional(v.any()),
+      semanticActionCandidates: v.optional(v.array(v.any())),
+      selectedSemanticAction: v.optional(v.any()),
+      semanticTriggered: v.optional(v.boolean()),
     }),
   ),
   inProgressOperation: v.optional(

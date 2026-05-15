@@ -13,6 +13,44 @@ type FactRecord = {
   tags?: string[];
 };
 
+type EnvironmentContextDebug = {
+  playerId: string;
+  currentArea?: {
+    id: string;
+    name: string;
+    type: string;
+    tags: string[];
+    socialMeaning: string;
+  };
+  nearbyObjects: Array<{
+    id: string;
+    name: string;
+    type: string;
+    distance: number;
+    affordances: string[];
+    tags: string[];
+    interactable: boolean;
+    description: string;
+  }>;
+  nearbyPeople: Array<{
+    playerId: string;
+    distance: number;
+    isInConversation: boolean;
+    activity?: string;
+  }>;
+  environmentHints: string[];
+};
+
+type SemanticActionCandidateDebug = {
+  kind: string;
+  score: number;
+  reasons: string[];
+  targetPlayerId?: string;
+  targetObjectId?: string;
+  targetAreaId?: string;
+  destination?: { x: number; y: number };
+};
+
 type DebugView = {
   sceneId: string;
   sceneType: string;
@@ -58,6 +96,10 @@ type DebugPayload = {
       summary: string;
       reasons: string[];
       topCandidateScores: Array<{ playerId: string; score: number }>;
+      environmentContext?: EnvironmentContextDebug;
+      semanticActionCandidates?: SemanticActionCandidateDebug[];
+      selectedSemanticAction?: SemanticActionCandidateDebug;
+      semanticTriggered?: boolean;
     } | null;
   }>;
 };
@@ -86,6 +128,126 @@ function VisibilityBadge({ visibility }: { visibility: string }) {
     >
       {visibility}
     </span>
+  );
+}
+
+function CandidateTarget({ candidate }: { candidate: SemanticActionCandidateDebug }) {
+  if (candidate.targetPlayerId) {
+    return <span>目标角色：{candidate.targetPlayerId}</span>;
+  }
+  if (candidate.targetObjectId) {
+    return <span>目标物品：{candidate.targetObjectId}</span>;
+  }
+  if (candidate.targetAreaId) {
+    return <span>目标区域：{candidate.targetAreaId}</span>;
+  }
+  return <span>无目标</span>;
+}
+
+function SemanticDecisionDetails({
+  context,
+  candidates,
+  selected,
+  triggered,
+}: {
+  context?: EnvironmentContextDebug;
+  candidates?: SemanticActionCandidateDebug[];
+  selected?: SemanticActionCandidateDebug;
+  triggered?: boolean;
+}) {
+  if (!context && (!candidates || candidates.length === 0)) {
+    return <p className="text-brown-200 mt-2">暂无空间语义数据，当前使用原主动交互逻辑。</p>;
+  }
+
+  return (
+    <div className="mt-3 rounded bg-brown-800/40 p-3 space-y-3">
+      <p className="font-display text-lg">空间语义决策链路</p>
+      <p>是否由空间语义触发：{triggered ? '是' : '否'}</p>
+      {context?.currentArea ? (
+        <div>
+          <p>当前区域：{context.currentArea.name}</p>
+          <p className="text-brown-200">区域含义：{context.currentArea.socialMeaning}</p>
+          <p className="text-brown-200">区域标签：{context.currentArea.tags.join('、') || '无'}</p>
+        </div>
+      ) : (
+        <p>当前区域：未识别</p>
+      )}
+
+      <div>
+        <p>附近物品：</p>
+        {context?.nearbyObjects?.length ? (
+          <ul className="list-disc pl-5 mt-1 space-y-1">
+            {context.nearbyObjects.map((object) => (
+              <li key={object.id}>
+                {object.name}，距离 {object.distance.toFixed(1)}，能力：
+                {object.affordances.join('、') || '无'}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-brown-200">无</p>
+        )}
+      </div>
+
+      <div>
+        <p>附近人物：</p>
+        {context?.nearbyPeople?.length ? (
+          <ul className="list-disc pl-5 mt-1 space-y-1">
+            {context.nearbyPeople.map((person) => (
+              <li key={person.playerId}>
+                {person.playerId}，距离 {person.distance.toFixed(1)}，
+                {person.isInConversation ? '正在对话' : '空闲'}
+                {person.activity ? `，活动：${person.activity}` : ''}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-brown-200">无</p>
+        )}
+      </div>
+
+      <div>
+        <p>环境提示：</p>
+        {context?.environmentHints?.length ? (
+          <ul className="list-disc pl-5 mt-1 space-y-1">
+            {context.environmentHints.map((hint, index) => (
+              <li key={`hint-${index}`}>{hint}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-brown-200">无</p>
+        )}
+      </div>
+
+      <div>
+        <p>候选行为：</p>
+        {candidates?.length ? (
+          <ul className="list-disc pl-5 mt-1 space-y-2">
+            {candidates.map((candidate, index) => (
+              <li key={`${candidate.kind}-${index}`}>
+                <p>
+                  {candidate.kind}，得分 {candidate.score.toFixed(1)}，<CandidateTarget candidate={candidate} />
+                </p>
+                {candidate.destination && (
+                  <p className="text-brown-200">
+                    目标点：({candidate.destination.x}, {candidate.destination.y})
+                  </p>
+                )}
+                <p className="text-brown-200">理由：{candidate.reasons.join('；') || '无'}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-brown-200">无</p>
+        )}
+      </div>
+
+      {selected && (
+        <p>
+          最终语义选择：{selected.kind}，得分 {selected.score.toFixed(1)}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -129,6 +291,7 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
           场景调试面板
         </h2>
       </div>
+
       <div className="desc mt-4">
         <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-2">
           <p>场景：{scene.title}</p>
@@ -137,7 +300,7 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
           <p>阶段：{scene.currentPhase}</p>
           <p>氛围：{scene.tone}</p>
           <p>公开摘要：{scene.publicSummary}</p>
-          <p>压力来源：{scene.pressureSource.join('、')}</p>
+          <p>压力来源：{scene.pressureSource.join('、') || '无'}</p>
         </div>
       </div>
 
@@ -147,7 +310,7 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
             <p className="font-display text-lg">运行时 Scene Seed</p>
             <p>sceneId：{runtimeSceneState.sceneId}</p>
             <p>sceneType：{runtimeSceneState.sceneType}</p>
-            <p>角色名：{runtimeSceneState.roleNames.join('、')}</p>
+            <p>角色名：{runtimeSceneState.roleNames.join('、') || '无'}</p>
             <p>公开事实 ID：{runtimeSceneState.publicFactIds.join('、') || '无'}</p>
             <p>隐藏事实 ID：{runtimeSceneState.hiddenFactIds.join('、') || '无'}</p>
           </div>
@@ -157,7 +320,7 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
       <div className="desc mt-4">
         <div className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm p-4 space-y-2">
           <p className="font-display text-lg">全局隐藏信息</p>
-          <p>这些信息当前不会直接出现在任何角色视图里，只用于说明后续可暴露的事实。</p>
+          <p>这些信息不会直接进入角色视图，只用于说明后续可暴露的事实。</p>
           <ul className="list-disc pl-5 mt-1 space-y-2">
             {scene.hiddenFacts.map((fact) => (
               <li key={fact.id}>
@@ -264,9 +427,15 @@ export function SceneDebugPanel({ worldId }: { worldId: Id<'worlds'> }) {
                       </ul>
                     </div>
                   )}
+                  <SemanticDecisionDetails
+                    context={item.decision.environmentContext}
+                    candidates={item.decision.semanticActionCandidates}
+                    selected={item.decision.selectedSemanticAction}
+                    triggered={item.decision.semanticTriggered}
+                  />
                 </>
               ) : (
-                <p className="text-brown-200 mt-1">尚无决策记录。</p>
+                <p className="text-brown-200 mt-1">暂无决策记录。</p>
               )}
             </div>
           ))}

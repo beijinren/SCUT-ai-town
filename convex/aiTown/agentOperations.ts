@@ -18,6 +18,11 @@ import { serializedPlayer } from './player';
 import { demoMode } from './demoMode';
 import { serializedSceneWorldSeed } from './world';
 import { decideInteractionTiming } from './interactionTiming';
+import {
+  buildInteractionCandidates,
+  getEnvironmentContextForPlayer,
+  SemanticActionCandidate,
+} from './semanticEnvironment';
 import { buildGMContextFromSnapshots } from '../GM/runtime/gmContextLoader';
 import { guardGeneratedMessage } from '../GM/bridge/conversationGuardBridge';
 
@@ -249,6 +254,8 @@ export const agentDoSomething = internalAction({
   args: {
     worldId: v.id('worlds'),
     player: v.object(serializedPlayer),
+    allPlayers: v.array(v.object(serializedPlayer)),
+    playersInConversation: v.array(playerId),
     agent: v.object(serializedAgent),
     map: v.object(serializedWorldMap),
     otherFreePlayers: v.array(v.object(serializedPlayer)),
@@ -266,6 +273,27 @@ export const agentDoSomething = internalAction({
     const recentlyAttemptedInvite =
       agent.lastInviteAttempt && now < agent.lastInviteAttempt + CONVERSATION_COOLDOWN;
     const recentActivity = player.activity && now < player.activity.until + ACTIVITY_COOLDOWN;
+    const playersInConversation = new Set(args.playersInConversation);
+    const occupiedPositions = args.allPlayers
+      .filter((candidate) => candidate.id !== player.id)
+      .map((candidate) => candidate.position);
+    const environmentContext = getEnvironmentContextForPlayer(player, map, {
+      players: args.allPlayers.map((candidate) => ({
+        player: candidate,
+        isInConversation: playersInConversation.has(candidate.id),
+      })),
+    });
+    const hasSemanticMapData = map.semanticObjects.length > 0 || map.semanticAreas.length > 0;
+    const semanticActionCandidates = hasSemanticMapData
+      ? buildInteractionCandidates({
+          player,
+          environmentContext,
+          sceneState: args.sceneState,
+          worldMap: map,
+          otherFreePlayers: args.otherFreePlayers,
+          occupiedPositions,
+        })
+      : [];
     const decision = decideInteractionTiming({
       player: args.player,
       otherFreePlayers: args.otherFreePlayers,
@@ -273,6 +301,8 @@ export const agentDoSomething = internalAction({
       justLeftConversation: Boolean(justLeftConversation),
       recentlyAttemptedInvite: Boolean(recentlyAttemptedInvite),
       doingActivity: Boolean(player.activity && player.activity.until > now),
+      environmentContext,
+      semanticActionCandidates,
     });
     const interactionDecision = {
       timestamp: now,
@@ -283,7 +313,13 @@ export const agentDoSomething = internalAction({
       topCandidateScores: decision.candidateScores
         .slice(0, 3)
         .map((candidate) => ({ playerId: candidate.playerId, score: candidate.score })),
+      environmentContext: decision.environmentContext,
+      semanticActionCandidates: decision.semanticActionCandidates,
+      semanticTriggered: decision.semanticTriggered,
     };
+    if (decision.selectedSemanticAction) {
+      Object.assign(interactionDecision, { selectedSemanticAction: decision.selectedSemanticAction });
+    }
     const invitee =
       demoMode.disableAgentConversations || !decision.shouldInitiate
         ? undefined
@@ -291,8 +327,16 @@ export const agentDoSomething = internalAction({
 
     let destination;
     let activity;
+    const selectedSemanticAction = decision.selectedSemanticAction as SemanticActionCandidate | undefined;
+    if (selectedSemanticAction?.kind === 'move_to_object' || selectedSemanticAction?.kind === 'move_to_area') {
+      destination = selectedSemanticAction.destination;
+    }
     if (!invitee) {
-      if (!player.pathfinding && (recentActivity || justLeftConversation || recentlyAttemptedInvite)) {
+      if (selectedSemanticAction?.kind === 'wait') {
+        // Space semantics explicitly chose to wait: do not replace that with wandering/activity.
+      } else if (destination) {
+        // Space semantics selected a concrete reachable point near an object/area.
+      } else if (!player.pathfinding && (recentActivity || justLeftConversation || recentlyAttemptedInvite)) {
         destination = wanderDestination(map);
       } else if (!player.pathfinding && !recentActivity) {
         // TODO: have LLM choose the activity & emoji

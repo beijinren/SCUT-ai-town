@@ -3,6 +3,10 @@ import { internal } from './_generated/api';
 import { DatabaseReader, MutationCtx, mutation } from './_generated/server';
 import * as map from '../data/gentle';
 import { defaultSceneAgentDescriptions, defaultSceneProtocol } from '../data/scenes';
+import {
+  createDemoSemanticAreas,
+  createDemoSemanticObjects,
+} from '../data/semantic/crossMajorWorkshopSemantic';
 import { insertInput } from './aiTown/insertInput';
 import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
@@ -69,6 +73,7 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     worldId: worldId,
   });
   worldStatus = (await ctx.db.get(worldStatusId))!;
+  const sceneId = defaultSceneProtocol.worldSeed.sceneId;
   await ctx.db.insert('maps', {
     worldId,
     width: map.mapwidth,
@@ -80,6 +85,10 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     bgTiles: map.bgtiles,
     objectTiles: map.objmap,
     animatedSprites: map.animatedsprites,
+    // Temporary real map semantics: stored in the maps table and read by the real agent loop.
+    // Replace only data/semantic/crossMajorWorkshopSemantic.ts when Unity exports final data.
+    semanticObjects: createDemoSemanticObjects(sceneId),
+    semanticAreas: createDemoSemanticAreas(sceneId),
   });
   await ctx.scheduler.runAfter(0, internal.aiTown.main.runStep, {
     worldId,

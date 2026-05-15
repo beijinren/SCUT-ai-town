@@ -1,7 +1,8 @@
 import { DatabaseReader } from '../../_generated/server';
 import { Id } from '../../_generated/dataModel';
-import { GMFact, GMRuntimeContext } from '../gmTypes';
+import { GMFact, GMRuntimeContext, GMSceneObject, GMZone } from '../gmTypes';
 import { defaultSceneTemplate } from '../../../data/scenes';
+import type { SemanticArea, SemanticObject } from '../../aiTown/worldMap';
 
 interface GMWorldSnapshot {
   sceneState?: {
@@ -29,6 +30,8 @@ interface GMDescriptionsSnapshot {
   worldMap?: {
     width: number;
     height: number;
+    semanticObjects?: SemanticObject[];
+    semanticAreas?: SemanticArea[];
   } | null;
   playerDescriptions: Array<{
     playerId: string;
@@ -40,6 +43,62 @@ interface GMDescriptionsSnapshot {
     identity: string;
     plan: string;
   }>;
+}
+
+function semanticAreaToGMZone(area: SemanticArea): GMZone {
+  return {
+    id: area.id,
+    name: area.name,
+    roomId: area.name,
+    bounds: {
+      minX: area.bounds.x,
+      minY: area.bounds.y,
+      maxX: area.bounds.x + area.bounds.width,
+      maxY: area.bounds.y + area.bounds.height,
+    },
+  };
+}
+
+function semanticObjectToGMSceneObject(object: SemanticObject): GMSceneObject {
+  return {
+    id: object.id,
+    name: object.name,
+    kind: object.type,
+    position: object.position,
+    aliases: object.tags,
+    interactive: object.interactable,
+    zoneId: undefined,
+    roomId: undefined,
+  };
+}
+
+function buildGMZonesFromWorldMap(worldMap: GMDescriptionsSnapshot['worldMap'], fallback: {
+  zoneId: string;
+  sceneTitle: string;
+  sceneLocation: string;
+}) {
+  if (worldMap?.semanticAreas && worldMap.semanticAreas.length > 0) {
+    return worldMap.semanticAreas.map(semanticAreaToGMZone);
+  }
+  return worldMap
+    ? [
+        {
+          id: fallback.zoneId,
+          name: fallback.sceneLocation,
+          roomId: fallback.sceneTitle,
+          bounds: {
+            minX: 0,
+            minY: 0,
+            maxX: Math.max(0, worldMap.width - 1),
+            maxY: Math.max(0, worldMap.height - 1),
+          },
+        },
+      ]
+    : [];
+}
+
+function buildGMObjectsFromWorldMap(worldMap: GMDescriptionsSnapshot['worldMap']) {
+  return worldMap?.semanticObjects?.map(semanticObjectToGMSceneObject) ?? [];
 }
 
 interface GMMessageSnapshot {
@@ -162,22 +221,8 @@ export function buildGMContextFromSnapshots(args: {
     sceneId: zoneId,
     sceneTitle,
     actors,
-    zones: worldMap
-      ? [
-          {
-            id: zoneId,
-            name: sceneLocation,
-            roomId: sceneTitle,
-            bounds: {
-              minX: 0,
-              minY: 0,
-              maxX: Math.max(0, worldMap.width - 1),
-              maxY: Math.max(0, worldMap.height - 1),
-            },
-          },
-        ]
-      : [],
-    objects: [],
+    zones: buildGMZonesFromWorldMap(worldMap, { zoneId, sceneTitle, sceneLocation }),
+    objects: buildGMObjectsFromWorldMap(worldMap),
     facts,
     messages: args.messages.map((message) => ({
       id: message._id ?? `${message.author}-${message._creationTime ?? Date.now()}`,
@@ -218,6 +263,10 @@ export async function loadGMContext(
     .query('messages')
     .filter((q) => q.eq(q.field('worldId'), worldId))
     .collect();
+  const worldMap = await db
+    .query('maps')
+    .withIndex('worldId', (q) => q.eq('worldId', worldId))
+    .first();
 
   return normalizeGMContext({
     worldId,
@@ -232,8 +281,12 @@ export async function loadGMContext(
         position: player?.position ?? { x: 0, y: 0 },
       };
     }),
-    zones: [],
-    objects: [],
+    zones: buildGMZonesFromWorldMap(worldMap, {
+      zoneId: world.sceneState?.sceneId ?? 'scene',
+      sceneTitle: world.sceneState?.title ?? 'Scene',
+      sceneLocation: world.sceneState?.location ?? 'World',
+    }),
+    objects: buildGMObjectsFromWorldMap(worldMap),
     facts: [],
     messages: messages.map((message) => ({
       id: String(message._id),
