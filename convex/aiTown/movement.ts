@@ -1,10 +1,10 @@
 import { movementSpeed } from '../../data/characters';
-import { COLLISION_THRESHOLD } from '../constants';
 import { compressPath, distance, manhattanDistance, pointsEqual } from '../util/geometry';
 import { MinHeap } from '../util/minheap';
 import { Point, Vector } from '../util/types';
 import { Game } from './game';
 import { GameId } from './ids';
+import { getPlayerCollisionThreshold } from './mapRuntimeTuning';
 import { Player } from './player';
 import { WorldMap } from './worldMap';
 
@@ -181,7 +181,7 @@ export function blockedWithPositions(position: Point, otherPositions: Point[], m
     }
   }
   for (const otherPosition of otherPositions) {
-    if (distance(otherPosition, position) < COLLISION_THRESHOLD) {
+    if (distance(otherPosition, position) < getPlayerCollisionThreshold(map)) {
       return 'player';
     }
   }

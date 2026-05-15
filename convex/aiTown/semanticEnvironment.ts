@@ -273,14 +273,18 @@ function findNavigableDestination(args: {
   origin: { x: number; y: number };
   otherPlayers: SerializedPlayer[];
   selfPlayerId: string;
+  maxRadius?: number;
 }): { x: number; y: number } | undefined {
   const otherPositions = args.otherPlayers
     .filter((player) => player.id !== args.selfPlayerId)
     .map((player) => player.position);
-  for (const point of candidatePointsAround(args.origin, 2)) {
-    const candidate = { x: Math.round(point.x), y: Math.round(point.y) };
-    if (blockedWithPositions(candidate, otherPositions, args.map) === null) {
-      return candidate;
+  const maxRadius = args.maxRadius ?? 4;
+  for (let radius = 0; radius <= maxRadius; radius++) {
+    for (const point of candidatePointsAround(args.origin, radius)) {
+      const candidate = { x: Math.round(point.x), y: Math.round(point.y) };
+      if (blockedWithPositions(candidate, otherPositions, args.map) === null) {
+        return candidate;
+      }
     }
   }
   return undefined;
@@ -327,7 +331,15 @@ export function buildSemanticEnvironmentContext(args: {
   };
 }
 
-function objectFocusPoint(map: WorldMap, objectId: string) {
+function objectFocusPoint(
+  map: WorldMap,
+  objectId: string,
+  seen = new Set<string>(),
+): { x: number; y: number } | undefined {
+  if (seen.has(objectId)) {
+    return undefined;
+  }
+  seen.add(objectId);
   const marker = map.getFocusPointForObject(objectId);
   if (marker) {
     return { x: marker.x, y: marker.y };
@@ -335,6 +347,16 @@ function objectFocusPoint(map: WorldMap, objectId: string) {
   const object = map.objects.find((candidate) => candidate.id === objectId);
   if (!object) {
     return undefined;
+  }
+  if (object.parentObjectId) {
+    const parentFocusPoint: { x: number; y: number } | undefined = objectFocusPoint(
+      map,
+      object.parentObjectId,
+      seen,
+    );
+    if (parentFocusPoint) {
+      return parentFocusPoint;
+    }
   }
   return { x: object.x, y: object.y };
 }
@@ -419,6 +441,7 @@ export function buildSemanticActionCandidates(args: {
       origin: objectFocusPoint(args.map, object.id) ?? { x: object.x, y: object.y },
       otherPlayers: args.knownPlayers,
       selfPlayerId: args.player.id,
+      maxRadius: object.parentObjectId ? 5 : 4,
     });
     if (!destination) {
       continue;

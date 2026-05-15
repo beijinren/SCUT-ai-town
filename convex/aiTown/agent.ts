@@ -7,7 +7,6 @@ import {
   ACTION_TIMEOUT,
   AWKWARD_CONVERSATION_TIMEOUT,
   CONVERSATION_COOLDOWN,
-  CONVERSATION_DISTANCE,
   INVITE_ACCEPT_PROBABILITY,
   INVITE_TIMEOUT,
   MAX_CONVERSATION_DURATION,
@@ -30,6 +29,7 @@ import { demoMode } from "./demoMode";
 import { defaultConversationRules } from "./defaultConversationRules";
 import { buildConversationDecisionContext } from "./conversationDecisionContext";
 import { InteractionTargetCandidate } from "./interactionTiming";
+import { getConversationDistance } from './mapRuntimeTuning';
 import {
   serializedSemanticActionCandidate,
   serializedSemanticEnvironmentContext,
@@ -340,7 +340,7 @@ export class Agent {
 
         // Don't keep moving around if we're near enough.
         const playerDistance = distance(player.position, otherPlayer.position);
-        if (playerDistance < CONVERSATION_DISTANCE) {
+        if (playerDistance < getConversationDistance(game.worldMap)) {
           return;
         }
 

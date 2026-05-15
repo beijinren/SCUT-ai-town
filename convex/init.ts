@@ -7,9 +7,11 @@ import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { detectMismatchedLLMProvider } from './util/llm';
-import { DEFAULT_MAP_ID, getMapById } from '../data/maps/registry';
+import { DEFAULT_MAP_ID, getMapById, getMapRuntimeTuning } from '../data/maps/registry';
 
 const map = getMapById(DEFAULT_MAP_ID);
+const runtimeTuning = getMapRuntimeTuning(DEFAULT_MAP_ID);
+const spawnMarkers = (map.markers ?? []).filter((marker) => marker.type === 'Spawn');
 
 const init = mutation({
   args: {
@@ -30,11 +32,14 @@ const init = mutation({
       worldStatus.engineId,
     );
     if (shouldCreate) {
-      const toCreate =
-        args.numAgents !== undefined ? args.numAgents : defaultSceneAgentDescriptions.length;
+      const defaultAgentCount =
+        spawnMarkers.length > 0 ? spawnMarkers.length : defaultSceneAgentDescriptions.length;
+      const toCreate = args.numAgents !== undefined ? args.numAgents : defaultAgentCount;
       for (let i = 0; i < toCreate; i++) {
+        const spawnMarker = spawnMarkers[i];
         await insertInput(ctx, worldStatus.worldId, 'createAgent', {
           descriptionIndex: i % defaultSceneAgentDescriptions.length,
+          spawnPosition: spawnMarker ? { x: spawnMarker.x, y: spawnMarker.y } : undefined,
         });
       }
     }
@@ -127,6 +132,7 @@ async function upsertWorldMap(ctx: MutationCtx, worldId: Id<'worlds'>) {
     objects: map.objects,
     markers: map.markers,
     tileRegistry: map.tileRegistry,
+    runtimeTuning: map.runtimeTuning ?? runtimeTuning,
   };
   const existingMap = await ctx.db
     .query('maps')

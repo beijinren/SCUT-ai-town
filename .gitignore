@@ -5,3 +5,29 @@ node_modules/
 tsconfig.tsbuildinfo
 /dist/
 /memory/
+
+# 本地缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.DS_Store
+
+# IDE / 环境配置
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# 构建产物 / 依赖缓存
+node_modules/
+dist/
+build/
+
+# 不上传的文档目录
+docs/

@@ -77,6 +77,16 @@ const tileRegistryItem = {
 };
 export type TileRegistryItem = ObjectType<typeof tileRegistryItem>;
 
+const runtimeTuning = {
+  playerRenderScale: v.optional(v.number()),
+  defaultZoomMultiplier: v.optional(v.number()),
+  minZoomMultiplier: v.optional(v.number()),
+  maxZoomMultiplier: v.optional(v.number()),
+  playerCollisionThreshold: v.optional(v.number()),
+  conversationDistance: v.optional(v.number()),
+};
+export type RuntimeTuning = ObjectType<typeof runtimeTuning>;
+
 export const serializedWorldMap = {
   width: v.number(),
   height: v.number(),
@@ -100,6 +110,7 @@ export const serializedWorldMap = {
   objects: v.optional(v.array(v.object(semanticObject))),
   markers: v.optional(v.array(v.object(semanticMarker))),
   tileRegistry: v.optional(v.array(v.object(tileRegistryItem))),
+  runtimeTuning: v.optional(v.object(runtimeTuning)),
 };
 export type SerializedWorldMap = ObjectType<typeof serializedWorldMap>;
 
@@ -125,6 +136,7 @@ export class WorldMap {
   objects: SemanticObject[];
   markers: SemanticMarker[];
   tileRegistry: TileRegistryItem[];
+  runtimeTuning: RuntimeTuning;
 
   constructor(serialized: SerializedWorldMap) {
     this.width = serialized.width;
@@ -145,6 +157,7 @@ export class WorldMap {
     this.objects = serialized.objects ?? [];
     this.markers = serialized.markers ?? [];
     this.tileRegistry = serialized.tileRegistry ?? [];
+    this.runtimeTuning = serialized.runtimeTuning ?? {};
   }
 
   serialize(): SerializedWorldMap {
@@ -167,6 +180,7 @@ export class WorldMap {
       objects: this.objects,
       markers: this.markers,
       tileRegistry: this.tileRegistry,
+      runtimeTuning: this.runtimeTuning,
     };
   }
 

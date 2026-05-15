@@ -144,6 +144,7 @@ export const agentInputs = {
   createAgent: inputHandler({
     args: {
       descriptionIndex: v.number(),
+      spawnPosition: v.optional(point),
     },
     handler: (game, now, args) => {
       const description = defaultSceneAgentDescriptions[args.descriptionIndex];
@@ -153,6 +154,8 @@ export const agentInputs = {
         description.name,
         description.character,
         description.publicProfile,
+        undefined,
+        args.spawnPosition,
       );
       const agentId = game.allocId('agents');
       game.world.agents.set(

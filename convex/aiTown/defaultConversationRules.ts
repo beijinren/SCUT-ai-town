@@ -1,7 +1,6 @@
 import { stopPlayer } from './movement';
 import { Point } from '../util/types';
 import { distance, normalize, vector } from '../util/geometry';
-import { CONVERSATION_DISTANCE } from '../constants';
 import {
   ConversationActivationResult,
   ConversationRuleSet,
@@ -10,6 +9,7 @@ import {
 } from './conversationRules';
 import { ConversationMembership } from './conversationMembership';
 import { GameId, parseGameId } from './ids';
+import { getConversationDistance } from './mapRuntimeTuning';
 
 const MAX_CONVERSATION_PARTICIPANTS = 6;
 
@@ -41,9 +41,10 @@ function chooseNextParticipant(
 function hasReachedConversationCluster(
   player: { position: Point },
   participatingPlayers: Array<{ position: Point }>,
+  conversationDistance: number,
 ) {
   return participatingPlayers.some(
-    (otherPlayer) => distance(player.position, otherPlayer.position) < CONVERSATION_DISTANCE,
+    (otherPlayer) => distance(player.position, otherPlayer.position) < conversationDistance,
   );
 }
 
@@ -94,6 +95,7 @@ export const defaultConversationRules: ConversationRuleSet = {
     participants,
     sessionState,
   }): ConversationActivationResult {
+    const conversationDistance = getConversationDistance(game.worldMap);
     if (participants.length < 2) {
       return { shouldActivate: false, sessionState };
     }
@@ -109,7 +111,7 @@ export const defaultConversationRules: ConversationRuleSet = {
       }
       const [anchor, ...rest] = walkingOver;
       const allNearby = rest.every(
-        ({ player }) => distance(anchor.player.position, player.position) < CONVERSATION_DISTANCE,
+        ({ player }) => distance(anchor.player.position, player.position) < conversationDistance,
       );
       if (!allNearby) {
         return {
@@ -150,7 +152,13 @@ export const defaultConversationRules: ConversationRuleSet = {
 
     let joinedAny = false;
     for (const { player, membership } of walkingOver) {
-      if (hasReachedConversationCluster(player, participating.map(({ player }) => player))) {
+      if (
+        hasReachedConversationCluster(
+          player,
+          participating.map(({ player }) => player),
+          conversationDistance,
+        )
+      ) {
         stopPlayer(player);
         membership.status = { kind: 'participating', started: now };
         joinedAny = true;

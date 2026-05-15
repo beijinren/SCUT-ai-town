@@ -16,6 +16,39 @@ import { inputHandler } from './inputHandler';
 import { characters } from '../../data/characters';
 import { PlayerDescription } from './playerDescription';
 
+function candidatePointsAround(origin: Point, radius = 3) {
+  const points: Point[] = [];
+  for (let r = 0; r <= radius; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        if (r !== 0 && Math.abs(dx) !== r && Math.abs(dy) !== r) {
+          continue;
+        }
+        points.push({
+          x: origin.x + dx,
+          y: origin.y + dy,
+        });
+      }
+    }
+  }
+  return points;
+}
+
+function findJoinPositionNear(game: Game, now: number, preferredPosition: Point, maxRadius = 4) {
+  for (const candidate of candidatePointsAround(preferredPosition, maxRadius)) {
+    if (candidate.x < 0 || candidate.y < 0) {
+      continue;
+    }
+    if (candidate.x >= game.worldMap.width || candidate.y >= game.worldMap.height) {
+      continue;
+    }
+    if (!blocked(game, now, candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
 const pathfinding = v.object({
   destination: point,
   started: v.number(),
@@ -172,6 +205,7 @@ export class Player {
     character: string,
     description: string,
     tokenIdentifier?: string,
+    preferredPosition?: Point,
   ) {
     if (tokenIdentifier) {
       let numHumans = 0;
@@ -188,7 +222,13 @@ export class Player {
       }
     }
     let position;
+    if (preferredPosition) {
+      position = findJoinPositionNear(game, now, preferredPosition);
+    }
     for (let attempt = 0; attempt < 10; attempt++) {
+      if (position) {
+        break;
+      }
       const candidate = {
         x: Math.floor(Math.random() * game.worldMap.width),
         y: Math.floor(Math.random() * game.worldMap.height),

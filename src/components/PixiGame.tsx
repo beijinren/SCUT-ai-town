@@ -16,6 +16,11 @@ import { PositionIndicator } from "./PositionIndicator.tsx";
 import { SHOW_DEBUG_UI } from "./Game.tsx";
 import { ServerGame } from "../hooks/serverGame.ts";
 import { SemanticPerceptionOverlay } from './SemanticPerceptionOverlay.tsx';
+import {
+  getDefaultZoomMultiplier,
+  getMaxZoomMultiplier,
+  getMinZoomMultiplier,
+} from '../../convex/aiTown/mapRuntimeTuning.ts';
 
 export const PixiGame = (props: {
   worldId: Id<"worlds">;
@@ -94,7 +99,12 @@ export const PixiGame = (props: {
     props.width / Math.max(worldWidthPx, 1),
     props.height / Math.max(worldHeightPx, 1),
   );
-  const defaultViewportScale = Math.max(1.1, fitScale * 1.38);
+  const minViewportScale = Math.max(0.5, fitScale * getMinZoomMultiplier(props.game.worldMap));
+  const defaultViewportScale = Math.max(
+    minViewportScale,
+    fitScale * getDefaultZoomMultiplier(props.game.worldMap),
+  );
+  const maxViewportScale = Math.max(3.0, fitScale * getMaxZoomMultiplier(props.game.worldMap));
   const players = [...props.game.world.players.values()];
 
   // Zoom on the user’s avatar when it is created
@@ -136,6 +146,8 @@ export const PixiGame = (props: {
       worldWidth={worldWidthPx}
       worldHeight={worldHeightPx}
       initialScale={defaultViewportScale}
+      minScale={minViewportScale}
+      maxScale={maxViewportScale}
       viewportRef={viewportRef}
     >
       <PixiStaticMap

@@ -21,9 +21,14 @@ import { GameId } from "./aiTown/ids";
 const excludedTables: Array<TableNames> = ["embeddingsCache"];
 
 async function deleteAllRowsInTable(ctx: { db: any }, tableName: TableNames) {
-  const rows = await ctx.db.query(tableName).collect();
-  for (const row of rows) {
-    await ctx.db.delete(row._id);
+  for (;;) {
+    const rows = await ctx.db.query(tableName).take(DELETE_BATCH_SIZE);
+    if (rows.length === 0) {
+      return;
+    }
+    for (const row of rows) {
+      await ctx.db.delete(row._id);
+    }
   }
 }
 
@@ -41,14 +46,23 @@ export const wipeAllTables = internalMutation({
   },
 });
 
-// 开发期同步重置，避免异步清表后立刻 init 时拿到旧 world。
+// 开发期重建世界。
+// 不再同步清空所有表，因为地图语义和调试数据接入后，整库扫描很容易超过 Convex 的单次执行限制。
+// 这里改为“停掉当前 default world 并归档”，随后由 init 创建一个新的 default world。
 export const hardResetWorldState = mutation({
   handler: async (ctx) => {
-    for (const tableName of Object.keys(schema.tables) as TableNames[]) {
-      if (excludedTables.includes(tableName)) {
-        continue;
+    try {
+      const { worldStatus, engine } = await getDefaultWorld(ctx.db);
+      if (worldStatus.status === "running" && engine.running) {
+        await ctx.db.patch(worldStatus._id, { status: "stoppedByDeveloper" });
+        await stopEngine(ctx, worldStatus.worldId);
       }
-      await deleteAllRowsInTable(ctx, tableName);
+      await ctx.db.patch(worldStatus._id, {
+        isDefault: false,
+        status: "inactive",
+      });
+    } catch {
+      // 没有默认 world 时说明当前无需归档，直接让后续 init 创建即可。
     }
     return { ok: true };
   },

@@ -7,15 +7,12 @@ import { GameId } from '../../convex/aiTown/ids.ts';
 import { Id } from '../../convex/_generated/dataModel';
 import { Location, locationFields, playerLocation } from '../../convex/aiTown/location.ts';
 import { useHistoricalValue } from '../hooks/useHistoricalValue.ts';
-import { PlayerDescription } from '../../convex/aiTown/playerDescription.ts';
-import { WorldMap } from '../../convex/aiTown/worldMap.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
+import { getPlayerRenderScale } from '../../convex/aiTown/mapRuntimeTuning.ts';
 
 export type SelectElement = (element?: { kind: 'player'; id: GameId<'players'> }) => void;
 
 const logged = new Set<string>();
-const PLAYER_RENDER_SCALE = 1.5;
-
 export const Player = ({
   game,
   isViewer,
@@ -64,6 +61,7 @@ export const Player = ({
       (a) => a.playerId === player.id && !!a.inProgressOperation,
     );
   const tileDim = game.worldMap.tileDim;
+  const playerRenderScale = getPlayerRenderScale(game.worldMap);
   const historicalFacing = { dx: historicalLocation.dx, dy: historicalLocation.dy };
   return (
     <>
@@ -83,7 +81,7 @@ export const Player = ({
         textureUrl={character.textureUrl}
         spritesheetData={character.spritesheetData}
         speed={character.speed}
-        renderScale={PLAYER_RENDER_SCALE}
+        renderScale={playerRenderScale}
         onClick={() => {
           onClick({ kind: 'player', id: player.id });
         }}

@@ -3,11 +3,21 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { DEFAULT_SCENE_ID, getMapConfig } from './mapConfigs.js';
 
-const COLLISION_LAYER_ORDER = ['objmap', 'obj_bot', 'obj_top'];
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
+
+function readPngSize(pngPath) {
+  const buffer = fs.readFileSync(pngPath);
+  const pngSignature = '89504e470d0a1a0a';
+  if (buffer.subarray(0, 8).toString('hex') !== pngSignature) {
+    throw new Error(`Tileset is not a valid PNG: ${pngPath}`);
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+}
 
 function parseSceneId(argv) {
   if (argv.length === 0) {
@@ -49,51 +59,65 @@ function rowsToLayerXY(rows, width, height, layerName) {
   return layer;
 }
 
-function collectVisualLayers(scene) {
-  const sourceLayers = [
+function buildLayerLookup(scene) {
+  const allLayers = [
     ...(scene.bgLayers ?? []),
-    ...((scene.visualLayers ?? []).filter((layer) => layer.name === 'decoration')),
+    ...(scene.visualLayers ?? []),
+    ...(scene.collisionLayers ?? []),
   ];
-  return sourceLayers.map((layer) =>
-    rowsToLayerXY(layer.rows, scene.width, scene.height, layer.name),
-  );
+  const layersByName = new Map();
+  for (const layer of allLayers) {
+    if (!layersByName.has(layer.name)) {
+      layersByName.set(layer.name, []);
+    }
+    layersByName.get(layer.name).push(layer);
+  }
+  return layersByName;
 }
 
-function collectRenderableObjectLayers(scene) {
-  const visualLayerByName = new Map((scene.visualLayers ?? []).map((layer) => [layer.name, layer]));
-  const collisionLayerByName = new Map(
-    (scene.collisionLayers ?? []).map((layer) => [layer.name, layer]),
-  );
-  const orderedLayers = [
-    visualLayerByName.get('obj_bot'),
-    collisionLayerByName.get('objmap'),
-    visualLayerByName.get('obj_top'),
-  ].filter(Boolean);
-  const sourceLayers = orderedLayers;
-  return sourceLayers.map((layer) =>
-    rowsToLayerXY(layer.rows, scene.width, scene.height, layer.name),
-  );
-}
-
-function collectCollisionLayers(scene) {
-  const collisionLayers = scene.collisionLayers ?? [];
-  const visualLayers = scene.visualLayers ?? [];
-  const layerByName = new Map(collisionLayers.map((layer) => [layer.name, layer]));
-  const visualLayerByName = new Map(visualLayers.map((layer) => [layer.name, layer]));
-  const layers = COLLISION_LAYER_ORDER.filter(
-    (name) => layerByName.has(name) || visualLayerByName.has(name),
-  ).map((name) => {
-    const sourceLayer = layerByName.get(name) ?? visualLayerByName.get(name);
-    return rowsToLayerXY(sourceLayer.rows, scene.width, scene.height, name);
+function collectLayersByOrder(scene, layerNames, preferredSources) {
+  const layersByName = buildLayerLookup(scene);
+  return layerNames.flatMap((layerName) => {
+    const candidates = layersByName.get(layerName) ?? [];
+    if (candidates.length === 0) {
+      return [];
+    }
+    const preferredLayer =
+      preferredSources
+        .map((sourceName) => candidates.find((layer) => {
+          if (sourceName === 'bg') {
+            return (scene.bgLayers ?? []).includes(layer);
+          }
+          if (sourceName === 'visual') {
+            return (scene.visualLayers ?? []).includes(layer);
+          }
+          if (sourceName === 'collision') {
+            return (scene.collisionLayers ?? []).includes(layer);
+          }
+          return false;
+        }))
+        .find(Boolean) ?? candidates[0];
+    return [rowsToLayerXY(preferredLayer.rows, scene.width, scene.height, layerName)];
   });
+}
 
+function collectBackgroundLayers(scene, config) {
+  const layerNames = config.renderBackgroundLayers ?? [];
+  return collectLayersByOrder(scene, layerNames, ['bg', 'visual', 'collision']);
+}
+
+function collectRenderableObjectLayers(scene, config) {
+  const layerNames = config.renderObjectLayers ?? [];
+  return collectLayersByOrder(scene, layerNames, ['visual', 'collision', 'bg']);
+}
+
+function collectCollisionLayers(scene, config) {
+  const layerNames = config.collisionLayers ?? [];
+  const layers = collectLayersByOrder(scene, layerNames, ['collision', 'visual', 'bg']);
   if (layers.length === 0) {
     throw new Error(
-      `Scene "${scene.sceneId}" does not contain any supported collision layer: ${COLLISION_LAYER_ORDER.join(', ')}`,
+      `Scene "${scene.sceneId}" does not contain any configured collision layer: ${layerNames.join(', ')}`,
     );
-  }
-  if (!layerByName.has('objmap')) {
-    throw new Error(`Scene "${scene.sceneId}" is missing required collision layer "objmap"`);
   }
   return layers;
 }
@@ -159,10 +183,12 @@ function normalizePointEntity(scene, entity) {
 }
 
 function buildGeneratedModule(scene, config) {
-  const bgtiles = collectVisualLayers(scene);
-  const objmap = collectRenderableObjectLayers(scene);
+  const tilesetSourcePath = path.resolve(projectRoot, config.tilesetSourceFile);
+  const tilesetSize = readPngSize(tilesetSourcePath);
+  const bgtiles = collectBackgroundLayers(scene, config);
+  const objmap = collectRenderableObjectLayers(scene, config);
   const collisionmap = applyBlockedRects(
-    collectCollisionLayers(scene),
+    collectCollisionLayers(scene, config),
     config.blockedRects,
     scene.width,
     scene.height,
@@ -171,20 +197,22 @@ function buildGeneratedModule(scene, config) {
   const objects = (scene.objects ?? []).map((object) => normalizePointEntity(scene, object));
   const markers = (scene.markers ?? []).map((marker) => normalizePointEntity(scene, marker));
   const tileRegistry = scene.tileRegistry ?? [];
-  const sceneName = scene.sceneName ?? config.sceneId;
+  const sceneId = config.exportedSceneId ?? scene.sceneId ?? config.mapId;
+  const sceneName = config.exportedSceneName ?? scene.sceneName ?? config.mapId;
+  const runtimeTuning = config.runtimeTuning ?? {};
 
   return `// Auto-generated from Unity export.
 // Do not edit manually.
 
-export const sceneId = ${JSON.stringify(scene.sceneId ?? config.sceneId)};
+export const sceneId = ${JSON.stringify(sceneId)};
 export const sceneName = ${JSON.stringify(sceneName)};
 
 export const tilesetpath = ${JSON.stringify(config.tilesetPath)};
 export const tiledim = ${scene.tileDim};
 export const screenxtiles = ${scene.width};
 export const screenytiles = ${scene.height};
-export const tilesetpxw = ${config.tilesetPixelWidth};
-export const tilesetpxh = ${config.tilesetPixelHeight};
+export const tilesetpxw = ${tilesetSize.width};
+export const tilesetpxh = ${tilesetSize.height};
 
 export const bgtiles = ${JSON.stringify(bgtiles, null, 2)};
 export const objmap = ${JSON.stringify(objmap, null, 2)};
@@ -200,6 +228,7 @@ export const zones = ${JSON.stringify(zones, null, 2)};
 export const objects = ${JSON.stringify(objects, null, 2)};
 export const markers = ${JSON.stringify(markers, null, 2)};
 export const tileRegistry = ${JSON.stringify(tileRegistry, null, 2)};
+export const runtimeTuning = ${JSON.stringify(runtimeTuning, null, 2)};
 `;
 }
 
@@ -209,15 +238,14 @@ function writeGeneratedModule(outputModulePath, moduleSource) {
 }
 
 function logSummary(sceneId, config, scene) {
+  const tilesetSize = readPngSize(path.resolve(projectRoot, config.tilesetSourceFile));
   console.log(`[convertUnityScene] sceneId: ${sceneId}`);
   console.log(`[convertUnityScene] input json: ${config.inputJson}`);
   console.log(`[convertUnityScene] output module: ${config.outputModule}`);
   console.log(`[convertUnityScene] tileDim: ${scene.tileDim}`);
   console.log(`[convertUnityScene] size: ${scene.width} x ${scene.height}`);
   console.log(`[convertUnityScene] tileset path: ${config.tilesetPath}`);
-  console.log(
-    `[convertUnityScene] tileset px size: ${config.tilesetPixelWidth} x ${config.tilesetPixelHeight}`,
-  );
+  console.log(`[convertUnityScene] tileset px size: ${tilesetSize.width} x ${tilesetSize.height}`);
   console.log(`[convertUnityScene] zones count: ${(scene.zones ?? []).length}`);
   console.log(`[convertUnityScene] objects count: ${(scene.objects ?? []).length}`);
   console.log(`[convertUnityScene] markers count: ${(scene.markers ?? []).length}`);
