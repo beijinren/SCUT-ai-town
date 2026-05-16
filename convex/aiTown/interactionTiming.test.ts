@@ -23,6 +23,7 @@ describe('decideInteractionTiming', () => {
         },
       ],
       sceneState: {
+        sceneTemplateId: 'test-scene-template',
         sceneId: 'scene',
         sceneType: 'casual',
         title: '休息区',
@@ -80,6 +81,7 @@ describe('decideInteractionTiming', () => {
         },
       ],
       sceneState: {
+        sceneTemplateId: 'test-scene-template',
         sceneId: 'scene',
         sceneType: 'casual',
         title: '休息区',

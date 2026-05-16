@@ -32,6 +32,31 @@ export interface SceneFact {
   tags?: string[];
 }
 
+export interface SceneEpisodeGoal {
+  roleId: string;
+  currentGoal: string;
+}
+
+export interface SceneEpisodeProximityEvent {
+  turn: number;
+  event: string;
+  roleId: string;
+  reason: string;
+}
+
+export interface SceneEpisode {
+  id: string;
+  title: string;
+  timeLabel: string;
+  participantRoleIds: string[];
+  listenerRoleIds: string[];
+  goals: SceneEpisodeGoal[];
+  proximitySchedule: SceneEpisodeProximityEvent[];
+  maxTurns?: number;
+  exitRoleId?: string;
+  exitTurn?: number;
+}
+
 export interface ScenePhaseRule {
   phase: ScenePhase;
   allowedPermissions: PermissionName[];
@@ -43,6 +68,8 @@ export interface StructuredScene {
   id: string;
   type: SceneType;
   title: string;
+  schemaVersion?: string;
+  sourceFormat?: string;
   publicSummary: string;
   location: string;
   tone: string;
@@ -51,6 +78,9 @@ export interface StructuredScene {
   roles: SceneRole[];
   facts: SceneFact[];
   phaseRules: ScenePhaseRule[];
+  episodes?: SceneEpisode[];
+  defaultEpisodeId?: string;
+  activeEpisodeId?: string;
 }
 
 export interface SceneView {
@@ -63,19 +93,31 @@ export interface SceneView {
   currentPhase: ScenePhase;
   pressureSource: string[];
   role: SceneRole;
+  currentEpisodeId?: string;
+  currentEpisodeTitle?: string;
+  currentGoal?: string;
   visibleFacts: SceneFact[];
   availablePermissions: PermissionName[];
 }
 
 export interface SceneWorldSeed {
+  sceneTemplateId?: string;
   sceneId: string;
   sceneType: SceneType;
   title: string;
+  schemaVersion?: string;
+  sourceFormat?: string;
   publicSummary: string;
   location: string;
   tone: string;
   currentPhase: ScenePhase;
   pressureSource: string[];
+  activeEpisodeId?: string;
+  activeEpisodeTitle?: string;
+  activeRoleIds?: string[];
+  completedEpisodeIds?: string[];
+  executedEventIds?: string[];
+  episodeTurn?: number;
   roleIds: string[];
   roleNames: string[];
   publicFactIds: string[];
@@ -95,17 +137,23 @@ export interface SceneAgentSeed {
 
 export interface SceneUiState {
   scene: {
+    templateId: string;
     id: string;
     type: SceneType;
     title: string;
+    schemaVersion?: string;
+    sourceFormat?: string;
     publicSummary: string;
     location: string;
     tone: string;
     currentPhase: ScenePhase;
     pressureSource: string[];
+    activeEpisodeId?: string;
+    activeEpisodeTitle?: string;
   };
   hiddenFacts: SceneFact[];
   phaseRules: ScenePhaseRule[];
+  episodes: SceneEpisode[];
   roleViews: SceneView[];
 }
 

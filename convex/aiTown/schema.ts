@@ -24,6 +24,12 @@ export const aiTownTables = {
     status: v.union(v.literal('running'), v.literal('stoppedByDeveloper'), v.literal('inactive')),
   }).index('worldId', ['worldId']),
 
+  mapSelections: defineTable({
+    key: v.string(),
+    selectedMapId: v.string(),
+    updatedAt: v.number(),
+  }).index('key', ['key']),
+
   // This table contains the map data for a given world. Since it's a bit larger than the player
   // state and infrequently changes, we store it in a separate table.
   maps: defineTable({

@@ -1,5 +1,6 @@
 import {
   SceneAgentSeed,
+  SceneEpisode,
   SceneProtocol,
   SceneUiState,
   SceneView,
@@ -8,16 +9,39 @@ import {
 } from './sceneTypes';
 import { buildSceneViewForRole } from './sceneVisibility';
 
-function buildSceneWorldSeed(scene: StructuredScene): SceneWorldSeed {
+function getActiveEpisode(scene: StructuredScene): SceneEpisode | null {
+  if (!scene.episodes || scene.episodes.length === 0) {
+    return null;
+  }
+  const activeEpisodeId = scene.activeEpisodeId ?? scene.defaultEpisodeId;
+  if (!activeEpisodeId) {
+    return scene.episodes[0] ?? null;
+  }
+  return scene.episodes.find((candidate) => candidate.id === activeEpisodeId) ?? scene.episodes[0] ?? null;
+}
+
+function buildSceneWorldSeed(scene: StructuredScene, templateId: string): SceneWorldSeed {
+  const activeEpisode = getActiveEpisode(scene);
   return {
+    sceneTemplateId: templateId,
     sceneId: scene.id,
     sceneType: scene.type,
     title: scene.title,
+    schemaVersion: scene.schemaVersion,
+    sourceFormat: scene.sourceFormat,
     publicSummary: scene.publicSummary,
     location: scene.location,
     tone: scene.tone,
     currentPhase: scene.currentPhase,
     pressureSource: [...scene.pressureSource],
+    activeEpisodeId: activeEpisode?.id,
+    activeEpisodeTitle: activeEpisode?.title,
+    activeRoleIds: activeEpisode
+      ? [...activeEpisode.participantRoleIds, ...activeEpisode.listenerRoleIds]
+      : scene.roles.map((role) => role.id),
+    completedEpisodeIds: [],
+    executedEventIds: [],
+    episodeTurn: 0,
     roleIds: scene.roles.map((role) => role.id),
     roleNames: scene.roles.map((role) => role.name),
     publicFactIds: scene.facts.filter((fact) => fact.visibility === 'public').map((fact) => fact.id),
@@ -55,8 +79,9 @@ function buildSceneAgentSeed(view: SceneView): SceneAgentSeed {
       visibleFactSummary,
     ].join('\n'),
     plan: [
-      `你的公开目标：${view.role.publicGoal}。`,
-      `你的私下目标：${view.role.privateGoal}。`,
+      `你的基础公开目标：${view.role.publicGoal}。`,
+      `你的基础私下目标：${view.role.privateGoal}。`,
+      `你当前阶段的具体目标：${view.currentGoal ?? '暂无额外阶段目标，请先根据基础目标行动。'}。`,
       `你当前允许执行的社交权限：${permissionSummary}。`,
       `请在保持角色身份的前提下，根据你已知的信息和权限做出反应。`,
     ].join('\n'),
@@ -65,30 +90,45 @@ function buildSceneAgentSeed(view: SceneView): SceneAgentSeed {
   };
 }
 
-function buildSceneUiState(scene: StructuredScene, roleViews: SceneView[]): SceneUiState {
+function buildSceneUiState(
+  scene: StructuredScene,
+  templateId: string,
+  roleViews: SceneView[],
+): SceneUiState {
+  const activeEpisode = getActiveEpisode(scene);
   return {
     scene: {
+      templateId,
       id: scene.id,
       type: scene.type,
       title: scene.title,
+      schemaVersion: scene.schemaVersion,
+      sourceFormat: scene.sourceFormat,
       publicSummary: scene.publicSummary,
       location: scene.location,
       tone: scene.tone,
       currentPhase: scene.currentPhase,
       pressureSource: [...scene.pressureSource],
+      activeEpisodeId: activeEpisode?.id,
+      activeEpisodeTitle: activeEpisode?.title,
     },
     hiddenFacts: scene.facts.filter((fact) => fact.visibility === 'hidden'),
     phaseRules: [...scene.phaseRules],
+    episodes: [...(scene.episodes ?? [])],
     roleViews,
   };
 }
 
-export function buildSceneProtocol(scene: StructuredScene): SceneProtocol {
+export function buildSceneProtocol(
+  scene: StructuredScene,
+  options?: { templateId?: string },
+): SceneProtocol {
   const roleViews = scene.roles.map((role) => buildSceneViewForRole(scene, role.id));
+  const templateId = options?.templateId ?? scene.id;
   return {
     template: scene,
-    worldSeed: buildSceneWorldSeed(scene),
+    worldSeed: buildSceneWorldSeed(scene, templateId),
     agentSeeds: roleViews.map(buildSceneAgentSeed),
-    uiState: buildSceneUiState(scene, roleViews),
+    uiState: buildSceneUiState(scene, templateId, roleViews),
   };
 }

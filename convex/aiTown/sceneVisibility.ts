@@ -24,6 +24,17 @@ function assertPhaseRule(scene: StructuredScene, phase: ScenePhase): ScenePhaseR
   return rule;
 }
 
+function getActiveEpisode(scene: StructuredScene) {
+  if (!scene.episodes || scene.episodes.length === 0) {
+    return null;
+  }
+  const activeEpisodeId = scene.activeEpisodeId ?? scene.defaultEpisodeId;
+  if (!activeEpisodeId) {
+    return scene.episodes[0] ?? null;
+  }
+  return scene.episodes.find((candidate) => candidate.id === activeEpisodeId) ?? scene.episodes[0] ?? null;
+}
+
 function roleKnowsFact(role: SceneRole, fact: SceneFact): boolean {
   return (
     role.knownFactIds.includes(fact.id) ||
@@ -73,6 +84,8 @@ export function canRoleUsePermission(
 
 export function buildSceneViewForRole(scene: StructuredScene, roleId: string): SceneView {
   const role = assertRole(scene, roleId);
+  const activeEpisode = getActiveEpisode(scene);
+  const currentGoal = activeEpisode?.goals.find((goal) => goal.roleId === roleId)?.currentGoal;
   return {
     sceneId: scene.id,
     sceneType: scene.type,
@@ -83,6 +96,9 @@ export function buildSceneViewForRole(scene: StructuredScene, roleId: string): S
     currentPhase: scene.currentPhase,
     pressureSource: [...scene.pressureSource],
     role,
+    currentEpisodeId: activeEpisode?.id,
+    currentEpisodeTitle: activeEpisode?.title,
+    currentGoal,
     visibleFacts: getVisibleFactsForRole(scene, roleId),
     availablePermissions: getAvailablePermissionsForRole(scene, roleId),
   };

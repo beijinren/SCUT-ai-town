@@ -5,6 +5,7 @@ export const pressConferenceScene: StructuredScene = {
   id: 'scene_press_001',
   type: 'press_conference',
   title: '关于安全事故的紧急发布会',
+  sourceFormat: 'manual_structured_scene_v2',
   publicSummary:
     '一家科技企业在发生重大安全事故后召开紧急发布会。媒体、公司代表与现场观察者都在关注事故责任与信息披露。',
   location: '总部一层新闻发布厅',
@@ -153,6 +154,31 @@ export const pressConferenceScene: StructuredScene = {
       description: '收束阶段以控制信息出口为主。',
     },
   ],
+  episodes: [
+    {
+      id: 'press_conference_opening',
+      title: '发布会开场与试探提问',
+      timeLabel: 'press_conference_opening',
+      participantRoleIds: [
+        'moderator',
+        'spokesperson',
+        'investigative_reporter',
+        'internal_staff',
+        'industry_observer',
+      ],
+      listenerRoleIds: [],
+      goals: [
+        { roleId: 'moderator', currentGoal: '稳住场面并把发言顺序掌握在自己手里。' },
+        { roleId: 'spokesperson', currentGoal: '先给出安全口径内的回应，不被带去责任细节。' },
+        { roleId: 'investigative_reporter', currentGoal: '寻找公司话术里的第一处可追问缝隙。' },
+        { roleId: 'internal_staff', currentGoal: '先观察局势，判断是否有必要冒险释放线索。' },
+        { roleId: 'industry_observer', currentGoal: '记录各方表态，评估这场发布会的真实风险。' },
+      ],
+      proximitySchedule: [],
+    },
+  ],
+  defaultEpisodeId: 'press_conference_opening',
+  activeEpisodeId: 'press_conference_opening',
 };
 
 export const pressConferenceProtocol = buildSceneProtocol(pressConferenceScene);

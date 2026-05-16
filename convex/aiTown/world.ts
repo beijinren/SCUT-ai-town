@@ -14,14 +14,23 @@ export const historicalLocations = v.array(
 );
 
 export const serializedSceneWorldSeed = {
+  sceneTemplateId: v.optional(v.string()),
   sceneId: v.string(),
   sceneType: v.string(),
   title: v.string(),
+  schemaVersion: v.optional(v.string()),
+  sourceFormat: v.optional(v.string()),
   publicSummary: v.string(),
   location: v.string(),
   tone: v.string(),
   currentPhase: v.string(),
   pressureSource: v.array(v.string()),
+  activeEpisodeId: v.optional(v.string()),
+  activeEpisodeTitle: v.optional(v.string()),
+  activeRoleIds: v.optional(v.array(v.string())),
+  completedEpisodeIds: v.optional(v.array(v.string())),
+  executedEventIds: v.optional(v.array(v.string())),
+  episodeTurn: v.optional(v.number()),
   roleIds: v.array(v.string()),
   roleNames: v.array(v.string()),
   publicFactIds: v.array(v.string()),

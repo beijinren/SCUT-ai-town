@@ -1,12 +1,11 @@
 import type { MutationCtx } from '../_generated/server';
 import { InformationGraph } from '../GM/graph/informationGraph';
 import type { GMFact } from '../GM/gmTypes';
-import type { GameId } from './ids';
 
 type RecordMessagePropagationArgs = {
   worldId: string;
   sceneId?: string;
-  conversationId: GameId<'conversations'>;
+  conversationId: string;
   messageUuid: string;
   text: string;
   speakerAgentId: string;

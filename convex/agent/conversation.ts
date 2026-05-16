@@ -236,6 +236,7 @@ function formatSemanticPromptContext(args: {
     publicSummary: string;
     location: string;
     currentPhase: string;
+    activeEpisodeTitle?: string;
   };
   semanticContext?: ReturnType<typeof buildSemanticEnvironmentContext>;
   gmSpatialSummary?: string;
@@ -244,7 +245,9 @@ function formatSemanticPromptContext(args: {
   const lines: string[] = [];
   if (args.sceneState) {
     lines.push(
-      `Scene: ${args.sceneState.title} at ${args.sceneState.location}. Phase: ${args.sceneState.currentPhase}. Goal/background: ${args.sceneState.publicSummary}`,
+      `Scene: ${args.sceneState.title} at ${args.sceneState.location}. Phase: ${args.sceneState.currentPhase}. Current episode: ${
+        args.sceneState.activeEpisodeTitle ?? 'not specified'
+      }. Goal/background: ${args.sceneState.publicSummary}`,
     );
   }
   const currentArea = args.semanticContext?.currentArea;

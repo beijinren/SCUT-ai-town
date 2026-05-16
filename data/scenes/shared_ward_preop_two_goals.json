@@ -1,0 +1,267 @@
+{
+  "schema_version": "sotopia_goal_sequence_v1",
+  "run_name": "shared_ward_preop_two_goals",
+  "scene_type": "shared_hospital_room",
+  "scenario": "A standard two-bed inpatient room contains two patients and one family member for each bed. The room includes two hospital beds, bedside cabinets, IV stands, call buttons, a central privacy curtain, and a small bedside discussion area. The same room is reused across two short episodes: first, a daily ward interaction among the two patients and two accompanying family members; second, the attending doctor enters for pre-operative communication while the same people continue from the earlier interaction.",
+  "location": "health_room",
+  "locations": ["health_room", "hallway", "office"],
+  "action_affordances": [
+    "adjust_privacy_curtain",
+    "check_iv",
+    "sit_beside_bed",
+    "review_paperwork",
+    "press_call_button"
+  ],
+  "action_policy": {
+    "mode": "balanced",
+    "force_physical_actions": true,
+    "max_forced_action_agents": 1,
+    "required_physical_action_turns": [4, 9],
+    "force_private_messages": true,
+    "private_message_personal_turn": 2
+  },
+  "time_label": "shared_ward_day",
+  "models": {
+    "env": "gpt-4o-mini",
+    "agents": [
+      "gpt-4o-mini",
+      "gpt-4o-mini",
+      "gpt-4o-mini",
+      "gpt-4o-mini",
+      "gpt-4o-mini"
+    ]
+  },
+  "available_action_types": [
+    "none",
+    "speak",
+    "non-verbal communication",
+    "action",
+    "leave"
+  ],
+  "action_order": "round-robin",
+  "speaker_selection_mode": "willingness",
+  "willingness_policy": {
+    "mode": "deterministic_demo",
+    "max_turns": 12,
+    "exit_agent": "Liu Fang",
+    "exit_turn": 10
+  },
+  "identities": [
+    {
+      "identity_id": "zhang_guilan_patient",
+      "full_name": "Zhang Guilan",
+      "occupation": "Retired Primary School Teacher",
+      "scene_role": "bed_1_patient",
+      "secret": "She suspects the lung findings may be serious and knows her daughter is not telling her everything.",
+      "base_goal": "Stay composed, protect the room's calm atmosphere, and understand what may happen next without making her daughter panic.",
+      "profile": {
+        "age": 62,
+        "occupation": "Retired Primary School Teacher",
+        "gender": "Woman",
+        "gender_pronoun": "she/her",
+        "public_info": "Bed 1 patient. She is waiting for final pathology clarification after a lung biopsy and is physically stable but quietly watchful.",
+        "moral_values": ["dignity", "consideration", "family care"],
+        "decision_making_style": "careful and observant",
+        "secret": "She suspects the lung findings may be serious and knows her daughter is not telling her everything.",
+        "medical_context": "Possible early lung adenocarcinoma; final pathology has not been plainly disclosed to her.",
+        "privacy_boundary": "High privacy need when talking about illness; prefers the curtain closed for sensitive discussion.",
+        "practical_pressure": "Not under financial pressure, but worried about becoming a burden during recovery."
+      }
+    },
+    {
+      "identity_id": "li_wen_daughter",
+      "full_name": "Li Wen",
+      "occupation": "Corporate Finance Manager",
+      "scene_role": "bed_1_family",
+      "secret": "She has already inferred a high malignancy risk and is trying to keep that from her mother until the doctor confirms the plan.",
+      "base_goal": "Protect her mother's emotional stability, keep care orderly, and privately verify the medical reality before deciding how much to reveal.",
+      "profile": {
+        "age": 38,
+        "occupation": "Corporate Finance Manager",
+        "gender": "Woman",
+        "gender_pronoun": "she/her",
+        "public_info": "Bed 1 family member. She is financially stable, detail-oriented, and handling most hospital communication for her mother.",
+        "moral_values": ["responsibility", "accuracy", "protection"],
+        "decision_making_style": "structured and checking-driven",
+        "secret": "She has already inferred a high malignancy risk and is trying to keep that from her mother until the doctor confirms the plan.",
+        "medical_context": "She believes the disease may be cancerous and wants the most reliable treatment path.",
+        "privacy_boundary": "Strongly prefers private clinician-family conversations about high-risk findings.",
+        "practical_pressure": "Minimal money pressure, high pressure around uncertainty and making the right treatment choice."
+      }
+    },
+    {
+      "identity_id": "wang_qiang_patient",
+      "full_name": "Wang Qiang",
+      "occupation": "Factory Line Worker",
+      "scene_role": "bed_2_patient",
+      "secret": "He still hopes someone will say the appendicitis can be managed without surgery so he can get back to work faster and spend less.",
+      "base_goal": "Reduce pain, reduce cost, and avoid anything that feels like unnecessary treatment or lost work time.",
+      "profile": {
+        "age": 45,
+        "occupation": "Factory Line Worker",
+        "gender": "Man",
+        "gender_pronoun": "he/him",
+        "public_info": "Bed 2 patient. He has recurrent acute appendicitis and is booked for a routine minimally invasive surgery, but he does not feel the illness is serious.",
+        "moral_values": ["practicality", "family income", "endurance"],
+        "decision_making_style": "immediate and cost-sensitive",
+        "secret": "He still hopes someone will say the appendicitis can be managed without surgery so he can get back to work faster and spend less.",
+        "medical_context": "Recurrent acute appendicitis with a routine recommended operation and expected quick recovery.",
+        "privacy_boundary": "Low privacy concern; not bothered by public illness talk.",
+        "practical_pressure": "Strong concern about hospital cost, lost wages, and how quickly he can return to work."
+      }
+    },
+    {
+      "identity_id": "liu_fang_wife",
+      "full_name": "Liu Fang",
+      "occupation": "Part-time Cleaner",
+      "scene_role": "bed_2_family",
+      "secret": "She thinks the surgery is necessary, but she is anxious about every additional expense and is unsure how to ask about it clearly.",
+      "base_goal": "Persuade her husband to go through with treatment while finding out what they can afford and what the recovery will require.",
+      "profile": {
+        "age": 43,
+        "occupation": "Part-time Cleaner",
+        "gender": "Woman",
+        "gender_pronoun": "she/her",
+        "public_info": "Bed 2 family member. She is doing her best to care for her husband but knows very little about hospital procedure and post-op care.",
+        "moral_values": ["family duty", "frugality", "peace"],
+        "decision_making_style": "supportive and reactive",
+        "secret": "She thinks the surgery is necessary, but she is anxious about every additional expense and is unsure how to ask about it clearly.",
+        "medical_context": "She knows the condition is treatable and not life-threatening, but wants reassurance about cost and recovery.",
+        "privacy_boundary": "Low to moderate privacy concern; does not naturally notice how loud or exposed a conversation feels.",
+        "practical_pressure": "Heavy cost pressure and uncertainty about work disruption at home."
+      }
+    },
+    {
+      "identity_id": "dr_chen_attending",
+      "full_name": "Dr. Chen",
+      "occupation": "Attending General Surgeon",
+      "scene_role": "attending_doctor",
+      "secret": "He already knows the likely seriousness of bed 1 and intends to balance truthful communication with the family's request for a gentler disclosure approach.",
+      "base_goal": "Complete clear and humane pre-operative communication for both beds while preserving clinical accuracy and room order.",
+      "profile": {
+        "age": 35,
+        "occupation": "Attending General Surgeon",
+        "gender": "Man",
+        "gender_pronoun": "he/him",
+        "public_info": "The attending doctor knows both patients' cases and enters later for pre-operative communication.",
+        "moral_values": ["professional duty", "clarity", "care"],
+        "decision_making_style": "balanced and explanation-oriented",
+        "secret": "He already knows the likely seriousness of bed 1 and intends to balance truthful communication with the family's request for a gentler disclosure approach.",
+        "medical_context": "He manages the pre-op explanation for both a potentially serious oncology-adjacent case and a routine appendicitis surgery.",
+        "privacy_boundary": "Uses private framing when illness disclosure could strongly affect a patient or family dynamic.",
+        "practical_pressure": "Needs to finish complete informed communication without losing clinical precision."
+      }
+    }
+  ],
+  "role_assignments": [
+    {
+      "identity_id": "zhang_guilan_patient",
+      "personality_template_id": "big5_oh_ch_el_ah_nh"
+    },
+    {
+      "identity_id": "li_wen_daughter",
+      "personality_template_id": "big5_oh_ch_el_al_nh"
+    },
+    {
+      "identity_id": "wang_qiang_patient",
+      "personality_template_id": "big5_ol_cl_eh_al_nl"
+    },
+    {
+      "identity_id": "liu_fang_wife",
+      "personality_template_id": "big5_ol_cl_eh_ah_nh"
+    },
+    {
+      "identity_id": "dr_chen_attending",
+      "personality_template_id": "big5_oh_ch_el_ah_nl"
+    }
+  ],
+  "goal_sequence": [
+    {
+      "episode_id": "goal_1_daily_ward_interaction",
+      "time_label": "shared_ward_goal_1",
+      "initial_group_participants": [
+        "Zhang Guilan",
+        "Li Wen",
+        "Wang Qiang",
+        "Liu Fang"
+      ],
+      "initial_group_listeners": [],
+      "proximity_schedule": [],
+      "willingness_policy": {
+        "mode": "deterministic_demo",
+        "max_turns": 10,
+        "exit_agent": "Liu Fang",
+        "exit_turn": 9
+      },
+      "goal_assignments": [
+        {
+          "identity_id": "zhang_guilan_patient",
+          "current_goal": "Keep the room peaceful, interact politely with the other bed, and if the conversation turns toward illness, gently steer it away from anything too direct while quietly observing what others reveal."
+        },
+        {
+          "identity_id": "li_wen_daughter",
+          "current_goal": "Protect your mother's emotional stability, keep noise and disorder under control, and if there is a natural opening, mention that you still need to privately clarify some medical information later."
+        },
+        {
+          "identity_id": "wang_qiang_patient",
+          "current_goal": "Pass the time, talk casually, and make it clear that you still think the surgery might be avoidable or at least something you want to finish as cheaply and quickly as possible."
+        },
+        {
+          "identity_id": "liu_fang_wife",
+          "current_goal": "Help your husband settle down, keep the atmosphere friendly, and if conversation allows, show that cost and recovery time are the things you most want to ask about later."
+        },
+        {
+          "identity_id": "dr_chen_attending",
+          "current_goal": "Stay outside the room reviewing charts and do not join the ward conversation in this episode unless someone directly calls for urgent medical help."
+        }
+      ]
+    },
+    {
+      "episode_id": "goal_2_doctor_preop_discussion",
+      "time_label": "shared_ward_goal_2",
+      "initial_group_participants": [
+        "Zhang Guilan",
+        "Li Wen",
+        "Wang Qiang",
+        "Liu Fang"
+      ],
+      "initial_group_listeners": [],
+      "proximity_schedule": [
+        {
+          "turn": 2,
+          "event": "enter_range",
+          "agent": "Dr. Chen",
+          "reason": "The attending doctor enters the ward for the scheduled pre-operative conversation."
+        }
+      ],
+      "willingness_policy": {
+        "mode": "deterministic_demo",
+        "max_turns": 12,
+        "exit_agent": "Dr. Chen",
+        "exit_turn": 11
+      },
+      "goal_assignments": [
+        {
+          "identity_id": "zhang_guilan_patient",
+          "current_goal": "When the doctor arrives, listen carefully and try to understand the real seriousness of your case, the safety of surgery, and what recovery might look like, without openly forcing your daughter into conflict."
+        },
+        {
+          "identity_id": "li_wen_daughter",
+          "current_goal": "Use the doctor's arrival to privately or semi-privately verify the likely diagnosis, treatment path, risk, and what should or should not be explicitly said to your mother right now."
+        },
+        {
+          "identity_id": "wang_qiang_patient",
+          "current_goal": "Press for a concrete answer about whether surgery is truly necessary, what the cheapest reasonable plan is, and how soon you could realistically return to work."
+        },
+        {
+          "identity_id": "liu_fang_wife",
+          "current_goal": "Ask about insurance reimbursement, self-pay items, and post-op recovery burdens, while also trying to get your husband to stop resisting the operation if the doctor explains it clearly."
+        },
+        {
+          "identity_id": "dr_chen_attending",
+          "current_goal": "Enter the room, complete the pre-operative discussion for both beds, explain the necessity and plan for bed 2 in plain terms, and address bed 1 with a careful balance of truth, emotional pacing, and the family's wish for gentle disclosure."
+        }
+      ]
+    }
+  ]
+}

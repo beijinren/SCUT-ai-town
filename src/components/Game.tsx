@@ -15,6 +15,7 @@ import { SceneDebugPanel } from "./SceneDebugPanel.tsx";
 import { SceneInfoPanel } from "./SceneInfoPanel.tsx";
 import { GMDebugPanel } from "./GMDebugPanel.tsx";
 import ResetWorldButton from "./ResetWorldButton.tsx";
+import SceneSwitchControl from "./SceneSwitchControl.tsx";
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 const SHOW_DEV_RESET_BUTTON = import.meta.env.DEV;
@@ -107,7 +108,12 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           className="flex flex-col overflow-y-auto shrink-0 px-4 py-6 sm:px-6 lg:w-96 xl:pr-6 border-t-8 sm:border-t-0 sm:border-l-8 border-brown-900  bg-brown-800 text-brown-100"
           ref={scrollViewRef}
         >
-          {SHOW_DEV_RESET_BUTTON && <ResetWorldButton />}
+          {SHOW_DEV_RESET_BUTTON && (
+            <>
+              <SceneSwitchControl />
+              <ResetWorldButton />
+            </>
+          )}
           <PlayerDetails
             worldId={worldId}
             engineId={engineId}

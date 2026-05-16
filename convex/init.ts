@@ -1,15 +1,16 @@
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { DatabaseReader, MutationCtx, mutation } from './_generated/server';
-import { defaultSceneAgentDescriptions, defaultSceneProtocol } from '../data/scenes';
+import { getSceneTemplateForMap } from '../data/scenes';
 import { insertInput } from './aiTown/insertInput';
 import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { detectMismatchedLLMProvider } from './util/llm';
-import * as map from '../data/maps/interview_room/interviewRoomMap';
-
-const spawnMarkers = (map.markers ?? []).filter((marker) => marker.type === 'Spawn');
+import { getMapDefinition } from '../data/maps/mapCatalog.js';
+import { getMapById, getMapRuntimeTuning, MapId } from '../data/maps/registry';
+import { getSelectedMapId } from './aiTown/mapSelection';
+import { ensureSceneRuntimeState, getSceneAgentDescriptionsForState } from './aiTown/sceneRuntime';
 
 const init = mutation({
   args: {
@@ -17,7 +18,19 @@ const init = mutation({
   },
   handler: async (ctx, args) => {
     detectMismatchedLLMProvider();
-    const { worldStatus, engine } = await getOrCreateDefaultWorld(ctx);
+    const mapId = await getSelectedMapId(ctx.db);
+    const map = getMapById(mapId);
+    const mapDefinition = getMapDefinition(mapId);
+    const sceneTemplate = getSceneTemplateForMap(mapId);
+    const sceneState = ensureSceneRuntimeState(sceneTemplate.protocol.worldSeed);
+    const initialAgentDescriptions = getSceneAgentDescriptionsForState(sceneState);
+    const spawnMarkers = (map.markers ?? []).filter((marker) => marker.type === 'Spawn');
+    const spawnAssignments = buildSpawnAssignments(
+      initialAgentDescriptions,
+      spawnMarkers,
+      mapDefinition.spawnRoleBindings,
+    );
+    const { worldStatus, engine } = await getOrCreateDefaultWorld(ctx, mapId);
     if (worldStatus.status !== 'running') {
       console.warn(
         `Engine ${engine._id} is not active! Run "npx convex run testing:resume" to restart it.`,
@@ -31,13 +44,15 @@ const init = mutation({
     );
     if (shouldCreate) {
       const defaultAgentCount =
-        spawnMarkers.length > 0 ? spawnMarkers.length : defaultSceneAgentDescriptions.length;
+        spawnAssignments.length > 0 ? spawnAssignments.length : initialAgentDescriptions.length;
       const toCreate = args.numAgents !== undefined ? args.numAgents : defaultAgentCount;
       for (let i = 0; i < toCreate; i++) {
-        const spawnMarker = spawnMarkers[i];
+        const assignment = spawnAssignments[i];
+        const description =
+          assignment?.description ?? initialAgentDescriptions[i % initialAgentDescriptions.length];
         await insertInput(ctx, worldStatus.worldId, 'createAgent', {
-          descriptionIndex: i % defaultSceneAgentDescriptions.length,
-          spawnPosition: spawnMarker ? { x: spawnMarker.x, y: spawnMarker.y } : undefined,
+          description,
+          spawnPosition: assignment?.spawnPosition,
         });
       }
     }
@@ -45,15 +60,20 @@ const init = mutation({
 });
 export default init;
 
-async function getOrCreateDefaultWorld(ctx: MutationCtx) {
+async function getOrCreateDefaultWorld(ctx: MutationCtx, mapId: MapId) {
   const now = Date.now();
+  const sceneTemplate = getSceneTemplateForMap(mapId);
+  const sceneState = ensureSceneRuntimeState(sceneTemplate.protocol.worldSeed);
 
   let worldStatus = await ctx.db
     .query('worldStatus')
     .filter((q) => q.eq(q.field('isDefault'), true))
     .unique();
   if (worldStatus) {
-    await upsertWorldMap(ctx, worldStatus.worldId);
+    await upsertWorldMap(ctx, worldStatus.worldId, mapId);
+    await ctx.db.patch(worldStatus.worldId, {
+      sceneState,
+    });
     const engine = (await ctx.db.get(worldStatus.engineId))!;
     return { worldStatus, engine };
   }
@@ -65,7 +85,7 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     agents: [],
     conversations: [],
     players: [],
-    sceneState: defaultSceneProtocol.worldSeed,
+    sceneState,
   });
   const worldStatusId = await ctx.db.insert('worldStatus', {
     engineId: engineId,
@@ -75,7 +95,7 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     worldId: worldId,
   });
   worldStatus = (await ctx.db.get(worldStatusId))!;
-  await upsertWorldMap(ctx, worldId);
+  await upsertWorldMap(ctx, worldId, mapId);
   await ctx.scheduler.runAfter(0, internal.aiTown.main.runStep, {
     worldId,
     generationNumber: engine.generationNumber,
@@ -109,7 +129,16 @@ async function shouldCreateAgents(
   return true;
 }
 
-async function upsertWorldMap(ctx: MutationCtx, worldId: Id<'worlds'>) {
+async function upsertWorldMap(ctx: MutationCtx, worldId: Id<'worlds'>, mapId: MapId) {
+  const map = getMapById(mapId);
+  const mapDefinition = getMapDefinition(mapId);
+  const runtimeTuning = getMapRuntimeTuning(mapId);
+  const markers = (map.markers ?? []).map((marker) => ({
+    ...marker,
+    role:
+      marker.role ??
+      (marker.id ? mapDefinition.spawnRoleBindings?.[marker.id] : undefined),
+  }));
   const mapDoc = {
     worldId,
     width: map.mapwidth,
@@ -130,9 +159,9 @@ async function upsertWorldMap(ctx: MutationCtx, worldId: Id<'worlds'>) {
     objects: map.objects,
     semanticAreas: map.semanticAreas,
     semanticObjects: map.semanticObjects,
-    markers: map.markers,
+    markers,
     tileRegistry: map.tileRegistry,
-    runtimeTuning: map.runtimeTuning,
+    runtimeTuning: map.runtimeTuning ?? runtimeTuning,
   };
   const existingMap = await ctx.db
     .query('maps')
@@ -143,4 +172,41 @@ async function upsertWorldMap(ctx: MutationCtx, worldId: Id<'worlds'>) {
     return;
   }
   await ctx.db.insert('maps', mapDoc);
+}
+
+function buildSpawnAssignments(
+  agentDescriptions: ReturnType<typeof getSceneAgentDescriptionsForState>,
+  spawnMarkers: Array<{ id?: string; x: number; y: number }>,
+  spawnRoleBindings?: Record<string, string>,
+) {
+  if (spawnMarkers.length === 0) {
+    return [];
+  }
+
+  if (!spawnRoleBindings || Object.keys(spawnRoleBindings).length === 0) {
+    return agentDescriptions.map((description, index) => {
+      const marker = spawnMarkers[index];
+      return {
+        description,
+        spawnPosition: marker ? { x: marker.x, y: marker.y } : undefined,
+      };
+    });
+  }
+
+  const markerById = new Map(
+    spawnMarkers
+      .filter((marker): marker is { id: string; x: number; y: number } => typeof marker.id === 'string')
+      .map((marker) => [marker.id, marker]),
+  );
+
+  return agentDescriptions.map((description) => {
+    const markerId = Object.entries(spawnRoleBindings).find(
+      ([, roleId]) => roleId === description.roleId,
+    )?.[0];
+    const marker = markerId ? markerById.get(markerId) : undefined;
+    return {
+      description,
+      spawnPosition: marker ? { x: marker.x, y: marker.y } : undefined,
+    };
+  });
 }

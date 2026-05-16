@@ -1,17 +1,15 @@
 import { v } from 'convex/values';
 import { agentId, conversationId, parseGameId } from './ids';
-import { Player, activity } from './player';
+import { activity } from './player';
 import { Conversation, conversationInputs } from './conversation';
 import { movePlayer } from './movement';
 import { inputHandler } from './inputHandler';
 import { point } from '../util/types';
-import { AgentDescription } from './agentDescription';
-import { Agent } from './agent';
-import { defaultSceneAgentDescriptions } from '../../data/scenes';
 import {
   serializedSemanticActionCandidate,
   serializedSemanticEnvironmentContext,
 } from './semanticEnvironment';
+import { createSceneAgent } from './sceneAgentFactory';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -143,42 +141,21 @@ export const agentInputs = {
   }),
   createAgent: inputHandler({
     args: {
-      descriptionIndex: v.number(),
+      description: v.object({
+        roleId: v.string(),
+        name: v.string(),
+        character: v.string(),
+        publicProfile: v.string(),
+        identity: v.string(),
+        plan: v.string(),
+        visibleFactIds: v.array(v.string()),
+        availablePermissions: v.array(v.string()),
+      }),
       spawnPosition: v.optional(point),
     },
     handler: (game, now, args) => {
-      const description = defaultSceneAgentDescriptions[args.descriptionIndex];
-      const playerId = Player.join(
-        game,
-        now,
-        description.name,
-        description.character,
-        description.publicProfile,
-        undefined,
-        args.spawnPosition,
-      );
-      const agentId = game.allocId('agents');
-      game.world.agents.set(
-        agentId,
-        new Agent({
-          id: agentId,
-          playerId: playerId,
-          inProgressOperation: undefined,
-          lastConversation: undefined,
-          lastInviteAttempt: undefined,
-          lastInteractionDecision: undefined,
-          toRemember: undefined,
-        }),
-      );
-      game.agentDescriptions.set(
-        agentId,
-        new AgentDescription({
-          agentId: agentId,
-          publicProfile: description.publicProfile,
-          identity: description.identity,
-          plan: description.plan,
-        }),
-      );
+      const description = args.description;
+      const { agentId } = createSceneAgent(game, now, description, args.spawnPosition);
       return { agentId };
     },
   }),

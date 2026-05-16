@@ -1,7 +1,7 @@
 import { ConvexError, v } from 'convex/values';
 import { internalMutation, mutation, query } from './_generated/server';
 import { characters } from '../data/characters';
-import { defaultSceneTemplate } from '../data/scenes';
+import { defaultSceneTemplate, getSceneTemplateById, isKnownSceneTemplateId } from '../data/scenes';
 import { insertInput } from './aiTown/insertInput';
 import {
   DEFAULT_NAME,
@@ -11,8 +11,19 @@ import {
 } from './constants';
 import { playerId } from './aiTown/ids';
 import { buildSceneViewForRole } from './aiTown/sceneVisibility';
+import { StructuredScene } from './aiTown/sceneTypes';
 import { kickEngine, startEngine, stopEngine } from './aiTown/main';
 import { engineInsertInput } from './engine/abstractGame';
+
+function withRuntimeEpisode(scene: StructuredScene, activeEpisodeId?: string | null): StructuredScene {
+  if (!activeEpisodeId) {
+    return scene;
+  }
+  return {
+    ...scene,
+    activeEpisodeId,
+  };
+}
 
 export const defaultWorldStatus = query({
   handler: async (ctx) => {
@@ -247,11 +258,18 @@ export const sceneDebugViews = query({
     worldId: v.id('worlds'),
   },
   handler: async (ctx, args) => {
-    const scene = defaultSceneTemplate.definition.scene;
     const world = await ctx.db.get(args.worldId);
     if (!world) {
       throw new Error(`Invalid world ID: ${args.worldId}`);
     }
+    const sceneTemplateId = world.sceneState?.sceneTemplateId;
+    const scene =
+      sceneTemplateId && isKnownSceneTemplateId(sceneTemplateId)
+        ? withRuntimeEpisode(
+            getSceneTemplateById(sceneTemplateId).definition.scene,
+            world.sceneState?.activeEpisodeId,
+          )
+        : defaultSceneTemplate.definition.scene;
     const playerDescriptions = await ctx.db
       .query('playerDescriptions')
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId))
@@ -268,6 +286,9 @@ export const sceneDebugViews = query({
         tone: scene.tone,
         currentPhase: scene.currentPhase,
         pressureSource: scene.pressureSource,
+        activeEpisodeId: scene.activeEpisodeId,
+        activeEpisodeTitle:
+          scene.episodes?.find((episode) => episode.id === scene.activeEpisodeId)?.title ?? null,
         hiddenFacts: scene.facts.filter((fact) => fact.visibility === 'hidden'),
       },
       views: scene.roles.map((role) => ({

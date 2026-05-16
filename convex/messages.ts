@@ -73,5 +73,8 @@ export const writeMessage = mutation({
       playerId: args.playerId,
       timestamp: Date.now(),
     });
+    await insertInput(ctx, args.worldId, 'advanceSceneRuntime', {
+      reason: 'visible_message_committed',
+    });
   },
 });

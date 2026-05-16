@@ -4,6 +4,7 @@ import type {
   SceneRole,
   StructuredScene,
 } from '../../aiTown/sceneTypes';
+import { goalSequenceScenarioToStructuredScene } from './goalSequenceScenarioAdapter';
 import { extractIdentitySlotRefs, toId } from './scenarioPersonaDealer';
 
 type UnknownRecord = Record<string, unknown>;
@@ -127,6 +128,10 @@ function buildPrivateSecretFact(role: SceneRole, agentConfig: UnknownRecord): Sc
 export function scenarioConfigToStructuredScene(config: unknown): StructuredScene {
   if (!isRecord(config)) {
     throw new Error('Scenario config must be an object.');
+  }
+
+  if (readString(config.schema_version) === 'sotopia_goal_sequence_v1') {
+    return goalSequenceScenarioToStructuredScene(config);
   }
 
   const sceneId = getSceneId(config);

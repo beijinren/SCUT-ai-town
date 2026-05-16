@@ -1,10 +1,16 @@
 import { DatabaseReader } from '../../_generated/server';
 import { Id } from '../../_generated/dataModel';
 import { GMFact, GMRuntimeContext } from '../gmTypes';
-import { defaultSceneTemplate } from '../../../data/scenes';
+import {
+  defaultSceneTemplate,
+  getSceneTemplateById,
+  isKnownSceneTemplateId,
+} from '../../../data/scenes';
+import { StructuredScene } from '../../aiTown/sceneTypes';
 
 interface GMWorldSnapshot {
   sceneState?: {
+    sceneTemplateId?: string;
     sceneId: string;
     title: string;
     location: string;
@@ -104,8 +110,17 @@ export function normalizeGMContext(snapshot: GMRuntimeContext): GMRuntimeContext
   };
 }
 
-function buildFactKnowledgeMap(actorRoleByAgentId: Map<string, string>): GMFact[] {
-  const scene = defaultSceneTemplate.definition.scene;
+function resolveSceneTemplate(sceneTemplateId?: string | null): StructuredScene {
+  if (sceneTemplateId && isKnownSceneTemplateId(sceneTemplateId)) {
+    return getSceneTemplateById(sceneTemplateId).definition.scene;
+  }
+  return defaultSceneTemplate.definition.scene;
+}
+
+function buildFactKnowledgeMapForScene(
+  scene: StructuredScene,
+  actorRoleByAgentId: Map<string, string>,
+): GMFact[] {
   return scene.facts.map((fact) => {
     const knownBy = [...actorRoleByAgentId.entries()]
       .filter(([, roleId]) => {
@@ -150,7 +165,7 @@ export function buildGMContextFromSnapshots(args: {
   descriptions: GMDescriptionsSnapshot;
   messages: GMMessageSnapshot[];
 }): GMRuntimeContext {
-  const scene = defaultSceneTemplate.definition.scene;
+  const scene = resolveSceneTemplate(args.world.sceneState?.sceneTemplateId);
   const worldMap = args.descriptions.worldMap;
   const sceneTitle = args.world.sceneState?.title ?? worldMap?.sceneName ?? scene.title;
   const sceneLocation = args.world.sceneState?.location ?? worldMap?.sceneName ?? scene.location;
@@ -184,7 +199,7 @@ export function buildGMContextFromSnapshots(args: {
   });
 
   const playerToAgentId = new Map(actors.map((actor) => [actor.playerId, actor.agentId]));
-  const facts = buildFactKnowledgeMap(actorRoleByAgentId);
+  const facts = buildFactKnowledgeMapForScene(scene, actorRoleByAgentId);
   const zoneId = args.world.sceneState?.sceneId ?? worldMap?.sceneId ?? scene.id;
   const zones =
     worldMap?.zones?.map((zone) => ({
