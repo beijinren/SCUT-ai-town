@@ -1,0 +1,34 @@
+{
+  "Architecture": {
+    "purpose": "Per-agent context document. Scene-facing sections can be replaced when the scene changes.",
+    "privacyRule": "PrivateThoughts belong only to this agent and must not be copied into another agent context."
+  },
+  "Scene": {
+    "sceneId": "{{sceneId}}",
+    "title": "{{sceneTitle}}",
+    "phase": "{{scenePhase}}",
+    "publicSummary": "{{scenePublicSummary}}"
+  },
+  "Persona": {
+    "personaId": "{{personaId}}",
+    "description": "{{personaDescription}}"
+  },
+  "Identity": {
+    "roleId": "{{roleId}}",
+    "name": "{{agentName}}",
+    "identity": "{{identity}}",
+    "goal": "{{goal}}"
+  },
+  "PrivateThoughts": [],
+  "KnownFacts": [],
+  "SpatialContext": {
+    "currentArea": "{{currentArea}}",
+    "nearbyObjects": [],
+    "availableAffordances": []
+  },
+  "TurnPolicy": {
+    "oneSpeakerPerTurn": true,
+    "privateThoughtsAreNotSharedFacts": true,
+    "useInformationGraphForSharedKnowledge": true
+  }
+}
