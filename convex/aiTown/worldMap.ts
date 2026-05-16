@@ -108,6 +108,8 @@ export const serializedWorldMap = {
   originY: v.optional(v.number()),
   zones: v.optional(v.array(v.object(semanticZone))),
   objects: v.optional(v.array(v.object(semanticObject))),
+  semanticAreas: v.optional(v.array(v.object(semanticZone))),
+  semanticObjects: v.optional(v.array(v.object(semanticObject))),
   markers: v.optional(v.array(v.object(semanticMarker))),
   tileRegistry: v.optional(v.array(v.object(tileRegistryItem))),
   runtimeTuning: v.optional(v.object(runtimeTuning)),
@@ -153,8 +155,8 @@ export class WorldMap {
     this.sceneName = serialized.sceneName;
     this.originX = serialized.originX;
     this.originY = serialized.originY;
-    this.zones = serialized.zones ?? [];
-    this.objects = serialized.objects ?? [];
+    this.zones = serialized.zones ?? serialized.semanticAreas ?? [];
+    this.objects = serialized.objects ?? serialized.semanticObjects ?? [];
     this.markers = serialized.markers ?? [];
     this.tileRegistry = serialized.tileRegistry ?? [];
     this.runtimeTuning = serialized.runtimeTuning ?? {};
@@ -178,6 +180,8 @@ export class WorldMap {
       originY: this.originY,
       zones: this.zones,
       objects: this.objects,
+      semanticAreas: this.zones,
+      semanticObjects: this.objects,
       markers: this.markers,
       tileRegistry: this.tileRegistry,
       runtimeTuning: this.runtimeTuning,

@@ -7,7 +7,7 @@ import { serializedAgentDescription } from './agentDescription';
 import { serializedWorld } from './world';
 import { serializedWorldMap } from './worldMap';
 import { serializedConversation } from './conversation';
-import { conversationId, playerId } from './ids';
+import { agentId, conversationId, playerId } from './ids';
 
 export const aiTownTables = {
   // This table has a single document that stores all players, conversations, and agents. This
@@ -76,4 +76,33 @@ export const aiTownTables = {
     .index('edge', ['worldId', 'player1', 'player2', 'ended'])
     .index('conversation', ['worldId', 'player1', 'conversationId'])
     .index('playerHistory', ['worldId', 'player1', 'ended']),
+
+  informationGraphs: defineTable({
+    worldId: v.id('worlds'),
+    sceneId: v.optional(v.string()),
+    runId: v.string(),
+    conversationId,
+    currentRound: v.number(),
+    graph: v.any(),
+    exportPath: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('worldId', ['worldId'])
+    .index('conversation', ['worldId', 'conversationId']),
+
+  agentPrivateThoughts: defineTable({
+    worldId: v.id('worlds'),
+    conversationId,
+    turnId: v.string(),
+    messageUuid: v.string(),
+    agentId,
+    playerId,
+    isSpeaker: v.boolean(),
+    thought: v.string(),
+    createdAt: v.number(),
+  })
+    .index('agent', ['worldId', 'agentId', 'createdAt'])
+    .index('turn', ['worldId', 'conversationId', 'turnId'])
+    .index('conversation', ['worldId', 'conversationId', 'createdAt']),
 };

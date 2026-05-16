@@ -40,7 +40,7 @@ export const mapCatalog = {
     mapId: 'interview_room',
     exportedSceneId: 'interview_room',
     exportedSceneName: 'Interview Room',
-    inputJson: 'data/unity/interview_room.json',
+    inputJson: 'data/maps/interview_room/interview_room.json',
     outputModule: 'data/maps/generated/interviewRoom.ts',
     tilesetPath: '/ai-town/assets/maps/interview_room/interview_room_tileset.png',
     tilesetSourceFile: 'public/assets/maps/interview_room/interview_room_tileset.png',

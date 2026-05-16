@@ -29,6 +29,7 @@ import {
 } from './semanticEnvironment';
 import {
   generateThought,
+  generateTurnThought,
 } from "../agent/thoughtGenerator";
 
 const selfInternal = internal.agent.conversation;
@@ -106,7 +107,37 @@ export const agentGenerateMessage = internalAction({
       conversationId: args.conversationId as GameId<"conversations">,
     });
 
-    const thought =
+    const participantNames = promptData.participantAgentContexts.map(
+      (participant: { name: string }) => participant.name,
+    );
+    const recentMessages = promptData.recentMessages
+      .map((message: { authorName: string; text: string }) => `${message.authorName}: ${message.text}`)
+      .join("\n");
+    const semanticContext = promptData.semanticPromptContext.join("\n");
+    const thoughts = await Promise.all(
+      promptData.participantAgentContexts.map(
+        async (participant: {
+          agentId: string;
+          playerId: string;
+          name: string;
+          identity: string;
+          plan: string;
+        }) => {
+          const thought = await generateTurnThought(ctx, {
+            agentName: participant.name,
+            participantNames,
+            identity: participant.identity,
+            plan: participant.plan,
+            isSpeaker: participant.playerId === args.playerId,
+            semanticContext,
+            recentMessages,
+          });
+          return { ...participant, thought };
+        },
+      ),
+    );
+    const speakerThought =
+      thoughts.find((entry) => entry.playerId === args.playerId)?.thought ??
       (await generateThought(
         ctx,
         args.worldId,
@@ -115,7 +146,25 @@ export const agentGenerateMessage = internalAction({
         promptData.player.name,
         promptData.otherPlayer.name,
         promptData.agent.identity,
-      )) ?? undefined;
+      )) ??
+      undefined;
+
+    for (const entry of thoughts) {
+      if (!entry.thought) {
+        continue;
+      }
+      await ctx.runMutation((internal as any).agentPrivateThoughts.recordAgentPrivateThought, {
+        worldId: args.worldId,
+        conversationId: args.conversationId,
+        turnId: args.messageUuid,
+        messageUuid: args.messageUuid,
+        agentId: entry.agentId,
+        playerId: entry.playerId,
+        isSpeaker: entry.playerId === args.playerId,
+        thought: entry.thought,
+        createdAt: Date.now(),
+      });
+    }
 
     const text = await completionFn(
       ctx,
@@ -123,7 +172,7 @@ export const agentGenerateMessage = internalAction({
       args.conversationId as GameId<"conversations">,
       args.playerId as GameId<"players">,
       args.otherPlayerId as GameId<"players">,
-      thought,
+      speakerThought,
     );
 
     await ctx.runMutation(internal.aiTown.agent.agentSendMessage, {
@@ -132,7 +181,7 @@ export const agentGenerateMessage = internalAction({
       agentId: args.agentId,
       playerId: args.playerId,
       text,
-      thought,
+      thought: speakerThought,
       messageUuid: args.messageUuid,
       leaveConversation: args.type === "leave",
       operationId: args.operationId,

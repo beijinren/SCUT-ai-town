@@ -1,4 +1,4 @@
-import * as interviewRoom from './generated/interviewRoom';
+import * as interviewRoom from './interview_room/interviewRoomMap';
 import { DEFAULT_MAP_ID as DEFAULT_CATALOG_MAP_ID, getMapDefinition } from './mapCatalog.js';
 
 export const DEFAULT_MAP_ID = DEFAULT_CATALOG_MAP_ID;

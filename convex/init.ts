@@ -7,10 +7,8 @@ import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { detectMismatchedLLMProvider } from './util/llm';
-import { DEFAULT_MAP_ID, getMapById, getMapRuntimeTuning } from '../data/maps/registry';
+import * as map from '../data/maps/interview_room/interviewRoomMap';
 
-const map = getMapById(DEFAULT_MAP_ID);
-const runtimeTuning = getMapRuntimeTuning(DEFAULT_MAP_ID);
 const spawnMarkers = (map.markers ?? []).filter((marker) => marker.type === 'Spawn');
 
 const init = mutation({
@@ -130,9 +128,11 @@ async function upsertWorldMap(ctx: MutationCtx, worldId: Id<'worlds'>) {
     originY: map.originY,
     zones: map.zones,
     objects: map.objects,
+    semanticAreas: map.semanticAreas,
+    semanticObjects: map.semanticObjects,
     markers: map.markers,
     tileRegistry: map.tileRegistry,
-    runtimeTuning: map.runtimeTuning ?? runtimeTuning,
+    runtimeTuning: map.runtimeTuning,
   };
   const existingMap = await ctx.db
     .query('maps')

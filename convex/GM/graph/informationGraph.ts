@@ -5,12 +5,42 @@ type KnowledgeEdgePayload = {
   factId: string;
   sourceType?: 'observation' | 'conversation' | 'memory' | 'system' | 'event';
   evidence?: string;
+  round?: number;
+  conversationId?: string;
+  messageUuid?: string;
+};
+
+export type InformationGraphSnapshot = {
+  facts: GMFact[];
+  knownBy: Array<{ factId: string; agentIds: string[] }>;
+  edges: Array<DirectedEdge<string, KnowledgeEdgePayload>>;
 };
 
 export class InformationGraph {
   private facts = new Map<string, GMFact>();
   private knownBy = new Map<string, Set<string>>();
   private edges: Array<DirectedEdge<string, KnowledgeEdgePayload>> = [];
+
+  static fromSnapshot(snapshot?: Partial<InformationGraphSnapshot> | null) {
+    const graph = new InformationGraph();
+    if (!snapshot) {
+      return graph;
+    }
+    for (const fact of snapshot.facts ?? []) {
+      graph.facts.set(fact.id, {
+        ...fact,
+        keywords: fact.keywords ?? [],
+        ownerAgentIds: fact.ownerAgentIds ?? [],
+        sharedWithAgentIds: fact.sharedWithAgentIds ?? [],
+        knownBy: fact.knownBy ?? [],
+      });
+    }
+    for (const entry of snapshot.knownBy ?? []) {
+      graph.knownBy.set(entry.factId, new Set(entry.agentIds));
+    }
+    graph.edges = [...(snapshot.edges ?? [])];
+    return graph;
+  }
 
   addFact(fact: GMFact) {
     // Facts are normalized at the boundary so later callers can swap in
@@ -126,6 +156,17 @@ export class InformationGraph {
 
   getEdges() {
     return [...this.edges];
+  }
+
+  toSnapshot(): InformationGraphSnapshot {
+    return {
+      facts: this.getFacts(),
+      knownBy: [...this.knownBy.entries()].map(([factId, agentIds]) => ({
+        factId,
+        agentIds: [...agentIds],
+      })),
+      edges: this.getEdges(),
+    };
   }
 
   getFactVisibility(factId: string): GMFactVisibility | undefined {

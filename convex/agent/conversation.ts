@@ -4,6 +4,10 @@ import { ActionCtx, internalQuery } from "../_generated/server";
 import { LLMMessage, chatCompletion } from "../util/llm";
 import { api, internal } from "../_generated/api";
 import { GameId, conversationId, playerId } from "../aiTown/ids";
+import { WorldMap } from "../aiTown/worldMap";
+import { buildSemanticEnvironmentContext } from "../aiTown/semanticEnvironment";
+import { buildGMContextFromSnapshots } from "../GM/runtime/gmContextLoader";
+import { buildSpatialSummaryForAgent } from "../GM/spatial/spatialSemantics";
 
 const selfInternal = internal.agent.conversation;
 
@@ -20,6 +24,7 @@ export async function startConversationMessage(
     otherPlayers,
     agent,
     otherAgents,
+    semanticPromptContext,
   } = await ctx.runQuery(selfInternal.queryPromptData, {
     worldId,
     playerId,
@@ -30,6 +35,7 @@ export async function startConversationMessage(
     `You are ${player.name}, and you just started speaking in a conversation with ${participantNames(otherPlayers)}.`,
   ];
   prompt.push(...agentPrompts(otherPlayers, agent, otherAgents));
+  prompt.push(...semanticPrompts(semanticPromptContext));
   if (thought) {
     prompt.push(
       `Before responding, keep this internal thought in mind: ${thought}`,
@@ -75,6 +81,7 @@ export async function continueConversationMessage(
     conversation,
     agent,
     otherAgents,
+    semanticPromptContext,
   } = await ctx.runQuery(selfInternal.queryPromptData, {
     worldId,
     playerId,
@@ -88,6 +95,7 @@ export async function continueConversationMessage(
     `The conversation started at ${started.toLocaleString()}. It's now ${now.toLocaleString()}.`,
   ];
   prompt.push(...agentPrompts(otherPlayers, agent, otherAgents));
+  prompt.push(...semanticPrompts(semanticPromptContext));
   if (thought) {
     prompt.push(
       `Before responding, keep this internal thought in mind: ${thought}`,
@@ -132,7 +140,7 @@ export async function leaveConversationMessage(
   otherPlayerId: GameId<"players">,
   thought?: string,
 ): Promise<string> {
-  const { player, otherPlayers, conversation, agent, otherAgents } =
+  const { player, otherPlayers, conversation, agent, otherAgents, semanticPromptContext } =
     await ctx.runQuery(selfInternal.queryPromptData, {
       worldId,
       playerId,
@@ -144,6 +152,7 @@ export async function leaveConversationMessage(
     `You've decided to leave the conversation and would like to politely tell the group that you're leaving.`,
   ];
   prompt.push(...agentPrompts(otherPlayers, agent, otherAgents));
+  prompt.push(...semanticPrompts(semanticPromptContext));
   if (thought) {
     prompt.push(
       `Before responding, keep this internal thought in mind: ${thought}`,
@@ -209,6 +218,64 @@ function agentPrompts(
     }
   }
   return prompt;
+}
+
+function semanticPrompts(lines?: string[]): string[] {
+  if (!lines || lines.length === 0) {
+    return [];
+  }
+  return [
+    'Use the current semantic environment when deciding what to say. Prefer concrete scene objects, areas, and workshop goals over generic props or unrelated topics.',
+    ...lines,
+  ];
+}
+
+function formatSemanticPromptContext(args: {
+  sceneState?: {
+    title: string;
+    publicSummary: string;
+    location: string;
+    currentPhase: string;
+  };
+  semanticContext?: ReturnType<typeof buildSemanticEnvironmentContext>;
+  gmSpatialSummary?: string;
+  gmKnownFacts?: string[];
+}) {
+  const lines: string[] = [];
+  if (args.sceneState) {
+    lines.push(
+      `Scene: ${args.sceneState.title} at ${args.sceneState.location}. Phase: ${args.sceneState.currentPhase}. Goal/background: ${args.sceneState.publicSummary}`,
+    );
+  }
+  const currentArea = args.semanticContext?.currentArea;
+  if (currentArea) {
+    lines.push(
+      `Current area: ${currentArea.name}. Social meaning: ${
+        currentArea.socialMeaning ?? 'not specified'
+      }. Tags: ${currentArea.tags.join(', ') || 'none'}.`,
+    );
+  }
+  const nearbyObjects = args.semanticContext?.nearbyObjects.slice(0, 6) ?? [];
+  if (nearbyObjects.length > 0) {
+    lines.push(
+      `Nearby usable objects: ${nearbyObjects
+        .map((object) => {
+          const affordances = object.affordances.length > 0 ? object.affordances.join('/') : 'observe';
+          return `${object.name} (${affordances})`;
+        })
+        .join('; ')}.`,
+    );
+  }
+  for (const hint of args.semanticContext?.environmentHints ?? []) {
+    lines.push(`Environment hint: ${hint}`);
+  }
+  if (args.gmSpatialSummary) {
+    lines.push(`GM spatial summary: ${args.gmSpatialSummary}`);
+  }
+  if (args.gmKnownFacts && args.gmKnownFacts.length > 0) {
+    lines.push(`GM known facts for you: ${args.gmKnownFacts.slice(0, 5).join(' | ')}`);
+  }
+  return lines;
 }
 
 async function previousMessages(
@@ -293,6 +360,7 @@ export const queryPromptData = internalQuery({
     );
     const otherPlayers = [];
     const nameById = new Map<string, string>([
+      [args.playerId, playerDescription.name],
       [args.otherPlayerId, otherPlayerDescription.name],
     ]);
     for (const participantId of participantIds) {
@@ -320,6 +388,16 @@ export const queryPromptData = internalQuery({
       otherPlayers.push({ name: participantName, ...participant });
     }
     const otherAgents: Array<{ name: string; publicProfile: string }> = [];
+    const participantAgentContexts: Array<{
+      agentId: string;
+      playerId: string;
+      name: string;
+      identity: string;
+      plan: string;
+    }> = [];
+    const participantPlayers = participantIds
+      .map((participantId) => world.players.find((p) => p.id === participantId))
+      .filter((participant): participant is NonNullable<typeof participant> => Boolean(participant));
     for (const participant of otherPlayers) {
       const agentRecord = world.agents.find(
         (a) => a.playerId === participant.id,
@@ -341,6 +419,125 @@ export const queryPromptData = internalQuery({
         name: participant.name,
       });
     }
+    for (const participant of participantPlayers) {
+      const agentRecord = world.agents.find((a) => a.playerId === participant.id);
+      if (!agentRecord) {
+        continue;
+      }
+      const description = await ctx.db
+        .query("agentDescriptions")
+        .withIndex("worldId", (q) =>
+          q.eq("worldId", args.worldId).eq("agentId", agentRecord.id),
+        )
+        .first();
+      if (!description) {
+        throw new Error(`Agent description for ${agentRecord.id} not found`);
+      }
+      let participantName = nameById.get(participant.id);
+      if (!participantName) {
+        const participantDescription = await ctx.db
+          .query("playerDescriptions")
+          .withIndex("worldId", (q) =>
+            q.eq("worldId", args.worldId).eq("playerId", participant.id),
+          )
+          .first();
+        if (!participantDescription) {
+          throw new Error(`Player description for ${participant.id} not found`);
+        }
+        participantName = participantDescription.name;
+        nameById.set(participant.id, participantName);
+      }
+      participantAgentContexts.push({
+        agentId: agentRecord.id,
+        playerId: participant.id,
+        name: participantName,
+        identity: description.identity,
+        plan: description.plan,
+      });
+    }
+    const recentRawMessages = await ctx.db
+      .query("messages")
+      .withIndex("conversationId", (q) =>
+        q.eq("worldId", args.worldId).eq("conversationId", args.conversationId),
+      )
+      .order("desc")
+      .take(6);
+    const recentMessages: Array<{ authorName: string; text: string }> = [];
+    const recentMessageSnapshots: Array<{
+      _id: string;
+      _creationTime: number;
+      author: string;
+      authorName: string;
+      conversationId: string;
+      text: string;
+    }> = [];
+    for (const message of recentRawMessages.reverse()) {
+      let authorName = nameById.get(message.author);
+      if (!authorName) {
+        const authorDescription = await ctx.db
+          .query("playerDescriptions")
+          .withIndex("worldId", (q) =>
+            q.eq("worldId", args.worldId).eq("playerId", message.author),
+          )
+          .first();
+        authorName = authorDescription?.name ?? message.author;
+        nameById.set(message.author, authorName);
+      }
+      recentMessages.push({ authorName, text: message.text });
+      recentMessageSnapshots.push({
+        _id: String(message._id),
+        _creationTime: message._creationTime,
+        author: message.author,
+        authorName,
+        conversationId: message.conversationId,
+        text: message.text,
+      });
+    }
+    const mapDoc = await ctx.db
+      .query("maps")
+      .withIndex("worldId", (q) => q.eq("worldId", args.worldId))
+      .unique();
+    const semanticContext = mapDoc
+      ? buildSemanticEnvironmentContext({
+          map: new WorldMap(mapDoc),
+          player,
+          knownPlayers: participantPlayers,
+        })
+      : undefined;
+    const allPlayerDescriptions = await ctx.db
+      .query("playerDescriptions")
+      .withIndex("worldId", (q) => q.eq("worldId", args.worldId))
+      .collect();
+    const allAgentDescriptions = await ctx.db
+      .query("agentDescriptions")
+      .withIndex("worldId", (q) => q.eq("worldId", args.worldId))
+      .collect();
+    const gmContext = buildGMContextFromSnapshots({
+      worldId: args.worldId,
+      world,
+      descriptions: {
+        worldMap: mapDoc,
+        playerDescriptions: allPlayerDescriptions,
+        agentDescriptions: allAgentDescriptions,
+      },
+      messages: recentMessageSnapshots,
+    });
+    const gmSpatialSummary = buildSpatialSummaryForAgent(gmContext, agent.id);
+    const gmKnownFacts = gmContext.facts
+      .filter(
+        (fact) =>
+          fact.visibility === 'public' ||
+          fact.knownBy?.includes(agent.id) ||
+          fact.ownerAgentIds?.includes(agent.id) ||
+          fact.sharedWithAgentIds?.includes(agent.id),
+      )
+      .map((fact) => `${fact.title}: ${fact.content}`);
+    const semanticPromptContext = formatSemanticPromptContext({
+      sceneState: world.sceneState,
+      semanticContext,
+      gmSpatialSummary,
+      gmKnownFacts,
+    });
     return {
       player: { name: playerDescription.name, ...player },
       otherPlayer: { name: otherPlayerDescription.name, ...otherPlayer },
@@ -352,6 +549,9 @@ export const queryPromptData = internalQuery({
         ...agent,
       },
       otherAgents,
+      participantAgentContexts,
+      recentMessages,
+      semanticPromptContext,
     };
   },
 });

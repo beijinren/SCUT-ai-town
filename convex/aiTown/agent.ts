@@ -30,6 +30,7 @@ import { defaultConversationRules } from "./defaultConversationRules";
 import { buildConversationDecisionContext } from "./conversationDecisionContext";
 import { InteractionTargetCandidate } from "./interactionTiming";
 import { getConversationDistance } from './mapRuntimeTuning';
+import { recordMessagePropagation } from './informationGraphBridge';
 import {
   serializedSemanticActionCandidate,
   serializedSemanticEnvironmentContext,
@@ -592,13 +593,34 @@ export const agentSendMessage = internalMutation({
     operationId: v.string(),
   },
   handler: async (ctx, args) => {
+    const world = await ctx.db.get(args.worldId);
+    if (!world) {
+      throw new Error(`World ${args.worldId} not found`);
+    }
+    const conversation = world.conversations.find((item) => item.id === args.conversationId);
+    const playerToAgentId = new Map(world.agents.map((agent) => [agent.playerId, agent.id]));
+    const heardByAgentIds =
+      conversation?.participants
+        .map((participant) => playerToAgentId.get(participant.playerId))
+        .filter((agentId): agentId is GameId<'agents'> => Boolean(agentId)) ?? [];
+    const round = (conversation?.numMessages ?? 0) + 1;
     await ctx.db.insert("messages", {
       conversationId: args.conversationId,
       author: args.playerId,
       text: args.text,
-      thought: args.thought,
       messageUuid: args.messageUuid,
       worldId: args.worldId,
+    });
+    await recordMessagePropagation(ctx, {
+      worldId: args.worldId,
+      sceneId: world.sceneState?.sceneId,
+      conversationId: args.conversationId,
+      messageUuid: args.messageUuid,
+      text: args.text,
+      speakerAgentId: args.agentId,
+      heardByAgentIds,
+      round,
+      createdAt: Date.now(),
     });
     await insertInput(ctx, args.worldId, "agentFinishSendingMessage", {
       conversationId: args.conversationId,

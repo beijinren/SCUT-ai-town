@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { insertInput } from './aiTown/insertInput';
 import { conversationId, playerId } from './aiTown/ids';
+import { recordMessagePropagation } from './aiTown/informationGraphBridge';
 
 export const listMessages = query({
   args: {
@@ -37,12 +38,35 @@ export const writeMessage = mutation({
     text: v.string(),
   },
   handler: async (ctx, args) => {
+    const world = await ctx.db.get(args.worldId);
+    if (!world) {
+      throw new Error(`World ${args.worldId} not found`);
+    }
+    const conversation = world.conversations.find((item) => item.id === args.conversationId);
+    const playerToAgentId = new Map(world.agents.map((agent) => [agent.playerId, agent.id]));
+    const heardByAgentIds =
+      conversation?.participants
+        .map((participant) => playerToAgentId.get(participant.playerId))
+        .filter((agentId): agentId is string => Boolean(agentId)) ?? [];
+    const speakerAgentId = playerToAgentId.get(args.playerId) ?? `human:${args.playerId}`;
+    const round = (conversation?.numMessages ?? 0) + 1;
     await ctx.db.insert('messages', {
       conversationId: args.conversationId,
       author: args.playerId,
       messageUuid: args.messageUuid,
       text: args.text,
       worldId: args.worldId,
+    });
+    await recordMessagePropagation(ctx, {
+      worldId: args.worldId,
+      sceneId: world.sceneState?.sceneId,
+      conversationId: args.conversationId,
+      messageUuid: args.messageUuid,
+      text: args.text,
+      speakerAgentId,
+      heardByAgentIds,
+      round,
+      createdAt: Date.now(),
     });
     await insertInput(ctx, args.worldId, 'finishSendingMessage', {
       conversationId: args.conversationId,

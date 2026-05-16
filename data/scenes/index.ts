@@ -1,5 +1,7 @@
 import { buildSceneProtocol } from '../../convex/aiTown/sceneProtocol';
 import { SceneAgentSeed, SceneProtocol, StructuredScene } from '../../convex/aiTown/sceneTypes';
+import { scenarioConfigToStructuredScene } from '../../convex/GM/setup/scenarioConfigAdapter';
+import crossMajorCreativeWorkshopConfig from '../scenarios/cross_major_creative_workshop_ai_town/scenario_config.json';
 import { casualCommonAreaScene } from './casualCommonArea';
 import { pressConferenceScene } from './pressConference';
 
@@ -28,18 +30,23 @@ export function createSceneTemplateRuntime(
 
 export const pressConferenceTemplate: SceneTemplateDefinition = {
   id: 'press-conference',
-  label: '企业危机发布会',
+  label: 'press conference',
   scene: pressConferenceScene,
 };
 
 export const casualCommonAreaTemplate: SceneTemplateDefinition = {
   id: 'casual-common-area',
-  label: '午后公共休息区',
+  label: 'casual common area',
   scene: casualCommonAreaScene,
 };
 
-// 当前默认实验模板已切换为更轻松的公共休息区场景。
-export const defaultSceneTemplate = createSceneTemplateRuntime(casualCommonAreaTemplate);
+export const crossMajorCreativeWorkshopTemplate: SceneTemplateDefinition = {
+  id: 'cross-major-creative-workshop-ai-town',
+  label: 'cross-major creative workshop',
+  scene: scenarioConfigToStructuredScene(crossMajorCreativeWorkshopConfig),
+};
+
+export const defaultSceneTemplate = createSceneTemplateRuntime(crossMajorCreativeWorkshopTemplate);
 
 export const defaultSceneProtocol = defaultSceneTemplate.protocol;
 

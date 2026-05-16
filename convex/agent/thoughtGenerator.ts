@@ -42,3 +42,49 @@ export async function generateThought(
     return null;
   }
 }
+
+export async function generateTurnThought(
+  ctx: ActionCtx,
+  args: {
+    agentName: string;
+    participantNames: string[];
+    identity: string;
+    plan: string;
+    isSpeaker: boolean;
+    semanticContext?: string;
+    recentMessages?: string;
+  },
+): Promise<string | null> {
+  try {
+    const thoughtPrompt: LLMMessage[] = [
+      {
+        role: "system",
+        content: [
+          `You are ${args.agentName}. Write a private internal thought for this conversation turn.`,
+          `Participants: ${args.participantNames.join(", ") || "unknown"}.`,
+          `Your identity: ${args.identity}`,
+          `Your goal: ${args.plan}`,
+          args.semanticContext ? `Current semantic environment: ${args.semanticContext}` : "",
+          args.recentMessages ? `Recent visible conversation: ${args.recentMessages}` : "",
+          args.isSpeaker
+            ? "You are about to speak. Think about what to say next."
+            : "You are not speaking this turn. Think privately about what you noticed and what you may do later.",
+          "Do not reveal hidden private information in this thought unless it belongs to you. Keep it concise, 2-4 sentences.",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      },
+    ];
+
+    const { content } = await chatCompletion(ctx, {
+      messages: thoughtPrompt,
+      max_tokens: THOUGHT_MAX_TOKENS,
+      temperature: THOUGHT_TEMPERATURE,
+    });
+
+    return content.trim();
+  } catch (error) {
+    console.warn("Failed to generate turn thought:", error);
+    return null;
+  }
+}
