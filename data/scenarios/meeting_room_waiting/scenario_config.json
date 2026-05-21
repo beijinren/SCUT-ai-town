@@ -1,0 +1,217 @@
+{
+  "run_name": "meeting_room_waiting",
+  "scene_id": "meeting_room_waiting",
+  "scene_design_docx": "AI Town 小型会议室交互场景（等待）设计报告.docx",
+  "scene_source": "builtin_registry",
+  "scenario": "In a small meeting room, two students arrive early before a project review. They are waiting for the teacher and need to use the quiet time to decide how to present their progress without making the room feel tense. 场景目标：The interaction should end with a clear, calm plan for how they will start the review when the teacher arrives.",
+  "location": "meeting_room",
+  "locations": [
+    "meeting_room",
+    "hallway"
+  ],
+  "action_affordances": [
+    "open_laptop",
+    "review_document",
+    "check_phone"
+  ],
+  "scene_object_categories": [
+    "room",
+    "door",
+    "meeting_table",
+    "chair",
+    "laptop",
+    "document",
+    "cup",
+    "pen",
+    "phone",
+    "whiteboard",
+    "projector_screen",
+    "cabinet",
+    "clock",
+    "trash_bin",
+    "plant"
+  ],
+  "action_policy": {
+    "mode": "balanced",
+    "force_physical_actions": true,
+    "max_forced_action_agents": 1,
+    "required_physical_action_turns": [
+      5,
+      10
+    ],
+    "force_private_messages": false,
+    "private_message_personal_turn": 0
+  },
+  "time_label": "meeting_room_waiting",
+  "scene_type": "meeting_room_waiting",
+  "protagonist_agent_index": 0,
+  "thinking_mode": "protagonist_only",
+  "personal_goal_judge_enabled": true,
+  "personal_goal_judge_mode": "llm_protagonist_thinking_and_speaking",
+  "goal_judge_model": "default",
+  "goal_judge_fallback_models": [
+    "gpt-5-mini"
+  ],
+  "goal_judge_structured_output": false,
+  "goal_judge_recent_agent_turn_window": 10,
+  "goal_judge_recent_context_turn_window": 3,
+  "goal_judge_timeout_seconds": 200.0,
+  "goal_judge_max_tokens": 400,
+  "goal_judge_litellm_debug": false,
+  "goal_judge_retry_attempts": 4,
+  "goal_judge_retry_delay": 5.0,
+  "persona_divergence_judge_enabled": true,
+  "persona_divergence_judge_model": "default",
+  "persona_divergence_judge_fallback_models": [
+    "gpt-5.2"
+  ],
+  "persona_divergence_judge_max_tokens": 320,
+  "persona_divergence_judge_timeout_seconds": 180.0,
+  "ai_intervention": {
+    "enabled": true,
+    "turns": [],
+    "strategy": "balanced_support",
+    "prompt_length": "sentence",
+    "max_words": 24,
+    "history_max_events": 0,
+    "temperature": 0.2,
+    "need_score_temperature": 0.25,
+    "acceptance_temperature": 0.25,
+    "timeout_seconds": 120.0,
+    "need_score_timeout_seconds": 120.0,
+    "acceptance_timeout_seconds": 120.0,
+    "max_tokens": 180,
+    "need_score_max_tokens": 80,
+    "acceptance_max_tokens": 220
+  },
+  "sotopia_builtin_eval_enabled": false,
+  "models_use_defaults": true,
+  "personallm_eval_enabled": true,
+  "personallm_apply_refinements": true,
+  "personallm_rescore_after_refinement": true,
+  "personallm_refinement_suggestion_mode": "protagonist_post_session",
+  "personallm_model": "default",
+  "identities": [
+    {
+      "identity_id": "ava_bennett_protagonist",
+      "full_name": "Ava Bennett",
+      "age": 22,
+      "gender": "Woman",
+      "occupation": "University student",
+      "scene_role": "protagonist",
+      "identity_summary": "Ava Bennett is a 22-year-old project team lead waiting in the meeting room before a review.",
+      "what_they_do": "She checks the presentation structure and tries to keep the waiting period productive.",
+      "base_goal": "Use the waiting time to align the opening, decide who says what, and reduce awkward tension before the teacher arrives."
+    },
+    {
+      "identity_id": "noah_clark_supporting_agent_1",
+      "full_name": "Noah Clark",
+      "age": 21,
+      "gender": "Man",
+      "occupation": "University student",
+      "scene_role": "supporting_agent_1",
+      "identity_summary": "Noah Clark is a 21-year-old teammate who is nervous about the upcoming review.",
+      "what_they_do": "He asks practical questions and helps check whether their explanation is understandable.",
+      "base_goal": "Make sure the team can explain the weak parts honestly without sounding unprepared."
+    }
+  ],
+  "role_assignments": [
+    {
+      "identity_id": "ava_bennett_protagonist",
+      "personality_template_id": "big5_oh_ch_eh_al_nl",
+      "current_goal": "Use the waiting time to align the opening, decide who says what, and reduce awkward tension before the teacher arrives."
+    },
+    {
+      "identity_id": "noah_clark_supporting_agent_1",
+      "personality_template_id": "big5_oh_ch_el_ah_nl",
+      "current_goal": "Make sure the team can explain the weak parts honestly without sounding unprepared."
+    }
+  ],
+  "agents": [
+    {
+      "first_name": "Ava",
+      "last_name": "Bennett",
+      "identity_id": "ava_bennett_protagonist",
+      "scene_role": "protagonist",
+      "narrative_role": "protagonist",
+      "identity_summary": "Ava Bennett is a 22-year-old project team lead waiting in the meeting room before a review.",
+      "what_they_do": "She checks the presentation structure and tries to keep the waiting period productive.",
+      "base_goal": "Use the waiting time to align the opening, decide who says what, and reduce awkward tension before the teacher arrives.",
+      "current_goal": "Use the waiting time to align the opening, decide who says what, and reduce awkward tension before the teacher arrives.",
+      "profile": {
+        "age": 22,
+        "occupation": "University student",
+        "gender": "Woman",
+        "gender_pronoun": "he/him",
+        "public_info": "She is responsible for starting the project review clearly.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "responsibility",
+          "clarity"
+        ],
+        "decision_making_style": "organized and reassuring",
+        "secret": "Ava Bennett privately wants to make progress on this goal: Use the waiting time to align the opening, decide who says what, and reduce awkward tension before the teacher arrives."
+      },
+      "goal": "Use the waiting time to align the opening, decide who says what, and reduce awkward tension before the teacher arrives."
+    },
+    {
+      "first_name": "Noah",
+      "last_name": "Clark",
+      "identity_id": "noah_clark_supporting_agent_1",
+      "scene_role": "supporting_agent_1",
+      "narrative_role": "supporting",
+      "identity_summary": "Noah Clark is a 21-year-old teammate who is nervous about the upcoming review.",
+      "what_they_do": "He asks practical questions and helps check whether their explanation is understandable.",
+      "base_goal": "Make sure the team can explain the weak parts honestly without sounding unprepared.",
+      "current_goal": "Make sure the team can explain the weak parts honestly without sounding unprepared.",
+      "profile": {
+        "age": 21,
+        "occupation": "University student",
+        "gender": "Man",
+        "gender_pronoun": "he/him",
+        "public_info": "He tends to notice risks and unclear details before a formal discussion.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "honesty",
+          "preparedness"
+        ],
+        "decision_making_style": "cautious and practical",
+        "secret": "Noah Clark privately wants to make progress on this goal: Make sure the team can explain the weak parts honestly without sounding unprepared."
+      },
+      "goal": "Make sure the team can explain the weak parts honestly without sounding unprepared."
+    }
+  ],
+  "models": {
+    "env": "default",
+    "agents": [
+      "default",
+      "default"
+    ]
+  },
+  "available_action_types": [
+    "none",
+    "speak",
+    "non-verbal communication",
+    "action",
+    "leave"
+  ],
+  "action_order": "round-robin",
+  "speaker_selection_mode": "willingness",
+  "initial_group_participants": [
+    "Ava Bennett",
+    "Noah Clark"
+  ],
+  "initial_group_listeners": [],
+  "proximity_schedule": [],
+  "willingness_policy": {
+    "mode": "deterministic_demo",
+    "min_total_turns": 15,
+    "max_total_turns": 20,
+    "max_turns": 20,
+    "low_willingness_end_enabled": true,
+    "low_willingness_threshold": 20,
+    "final_summary_max_words": 70,
+    "exit_agent": "",
+    "exit_turn": 0
+  }
+}

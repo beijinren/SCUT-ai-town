@@ -1,0 +1,216 @@
+{
+  "run_name": "cafe_encounter",
+  "scene_id": "cafe_encounter",
+  "scene_design_docx": "AI Town 咖啡馆交互场景（偶遇）设计报告.docx",
+  "scene_source": "builtin_registry",
+  "scenario": "In a campus cafe, two acquaintances unexpectedly meet while waiting near the counter. They have not talked in a while, and the protagonist needs to decide whether and how to restart a natural conversation. 场景目标：The interaction should end with a comfortable short exchange and a clear next social step, such as sitting briefly together or agreeing to talk later.",
+  "location": "coffee_shop",
+  "locations": [
+    "coffee_shop",
+    "queue_area",
+    "activity_area"
+  ],
+  "action_affordances": [
+    "wait_for_order",
+    "pick_up_drink",
+    "sit_down"
+  ],
+  "scene_object_categories": [
+    "room",
+    "door",
+    "counter",
+    "menu",
+    "table",
+    "chair",
+    "cup",
+    "phone",
+    "payment_terminal",
+    "tray",
+    "trash_bin",
+    "plant",
+    "clock"
+  ],
+  "action_policy": {
+    "mode": "balanced",
+    "force_physical_actions": true,
+    "max_forced_action_agents": 1,
+    "required_physical_action_turns": [
+      5,
+      10
+    ],
+    "force_private_messages": false,
+    "private_message_personal_turn": 0
+  },
+  "time_label": "cafe_encounter",
+  "scene_type": "cafe_encounter",
+  "protagonist_agent_index": 0,
+  "thinking_mode": "protagonist_only",
+  "personal_goal_judge_enabled": true,
+  "personal_goal_judge_mode": "llm_protagonist_thinking_and_speaking",
+  "goal_judge_model": "default",
+  "goal_judge_fallback_models": [
+    "gpt-5-mini"
+  ],
+  "goal_judge_structured_output": false,
+  "goal_judge_recent_agent_turn_window": 10,
+  "goal_judge_recent_context_turn_window": 3,
+  "goal_judge_timeout_seconds": 200.0,
+  "goal_judge_max_tokens": 400,
+  "goal_judge_litellm_debug": false,
+  "goal_judge_retry_attempts": 4,
+  "goal_judge_retry_delay": 5.0,
+  "persona_divergence_judge_enabled": true,
+  "persona_divergence_judge_model": "default",
+  "persona_divergence_judge_fallback_models": [
+    "gpt-5.2"
+  ],
+  "persona_divergence_judge_max_tokens": 320,
+  "persona_divergence_judge_timeout_seconds": 180.0,
+  "ai_intervention": {
+    "enabled": true,
+    "turns": [],
+    "strategy": "balanced_support",
+    "prompt_length": "sentence",
+    "max_words": 24,
+    "history_max_events": 0,
+    "temperature": 0.2,
+    "need_score_temperature": 0.25,
+    "acceptance_temperature": 0.25,
+    "timeout_seconds": 120.0,
+    "need_score_timeout_seconds": 120.0,
+    "acceptance_timeout_seconds": 120.0,
+    "max_tokens": 180,
+    "need_score_max_tokens": 80,
+    "acceptance_max_tokens": 220
+  },
+  "sotopia_builtin_eval_enabled": false,
+  "models_use_defaults": true,
+  "personallm_eval_enabled": true,
+  "personallm_apply_refinements": true,
+  "personallm_rescore_after_refinement": true,
+  "personallm_refinement_suggestion_mode": "protagonist_post_session",
+  "personallm_model": "default",
+  "identities": [
+    {
+      "identity_id": "sophie_reed_protagonist",
+      "full_name": "Sophie Reed",
+      "age": 24,
+      "gender": "Woman",
+      "occupation": "Graduate student",
+      "scene_role": "protagonist",
+      "identity_summary": "Sophie Reed is a 24-year-old graduate student who unexpectedly sees an old acquaintance in the cafe.",
+      "what_they_do": "She decides whether to greet them, keep the exchange light, and avoid making the moment awkward.",
+      "base_goal": "Start a natural greeting, read the other person's response, and create a comfortable opening for a brief conversation."
+    },
+    {
+      "identity_id": "daniel_kim_supporting_agent_1",
+      "full_name": "Daniel Kim",
+      "age": 25,
+      "gender": "Man",
+      "occupation": "Graduate student",
+      "scene_role": "supporting_agent_1",
+      "identity_summary": "Daniel Kim is a 25-year-old graduate student who recognizes Sophie while waiting for his order.",
+      "what_they_do": "He responds to the greeting and decides whether the conversation should continue or stay brief.",
+      "base_goal": "Respond naturally, show whether he is open to catching up, and keep the cafe encounter comfortable."
+    }
+  ],
+  "role_assignments": [
+    {
+      "identity_id": "sophie_reed_protagonist",
+      "personality_template_id": "big5_oh_ch_eh_ah_nl",
+      "current_goal": "Start a natural greeting, read the other person's response, and create a comfortable opening for a brief conversation."
+    },
+    {
+      "identity_id": "daniel_kim_supporting_agent_1",
+      "personality_template_id": "big5_oh_ch_el_ah_nl",
+      "current_goal": "Respond naturally, show whether he is open to catching up, and keep the cafe encounter comfortable."
+    }
+  ],
+  "agents": [
+    {
+      "first_name": "Sophie",
+      "last_name": "Reed",
+      "identity_id": "sophie_reed_protagonist",
+      "scene_role": "protagonist",
+      "narrative_role": "protagonist",
+      "identity_summary": "Sophie Reed is a 24-year-old graduate student who unexpectedly sees an old acquaintance in the cafe.",
+      "what_they_do": "She decides whether to greet them, keep the exchange light, and avoid making the moment awkward.",
+      "base_goal": "Start a natural greeting, read the other person's response, and create a comfortable opening for a brief conversation.",
+      "current_goal": "Start a natural greeting, read the other person's response, and create a comfortable opening for a brief conversation.",
+      "profile": {
+        "age": 24,
+        "occupation": "Graduate student",
+        "gender": "Woman",
+        "gender_pronoun": "he/him",
+        "public_info": "She knows the other person but has not spoken with them recently.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "warmth",
+          "respect"
+        ],
+        "decision_making_style": "socially observant and tactful",
+        "secret": "Sophie Reed privately wants to make progress on this goal: Start a natural greeting, read the other person's response, and create a comfortable opening for a brief conversation."
+      },
+      "goal": "Start a natural greeting, read the other person's response, and create a comfortable opening for a brief conversation."
+    },
+    {
+      "first_name": "Daniel",
+      "last_name": "Kim",
+      "identity_id": "daniel_kim_supporting_agent_1",
+      "scene_role": "supporting_agent_1",
+      "narrative_role": "supporting",
+      "identity_summary": "Daniel Kim is a 25-year-old graduate student who recognizes Sophie while waiting for his order.",
+      "what_they_do": "He responds to the greeting and decides whether the conversation should continue or stay brief.",
+      "base_goal": "Respond naturally, show whether he is open to catching up, and keep the cafe encounter comfortable.",
+      "current_goal": "Respond naturally, show whether he is open to catching up, and keep the cafe encounter comfortable.",
+      "profile": {
+        "age": 25,
+        "occupation": "Graduate student",
+        "gender": "Man",
+        "gender_pronoun": "he/him",
+        "public_info": "He is friendly but slightly busy while waiting for his drink.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "courtesy",
+          "ease"
+        ],
+        "decision_making_style": "friendly and low-pressure",
+        "secret": "Daniel Kim privately wants to make progress on this goal: Respond naturally, show whether he is open to catching up, and keep the cafe encounter comfortable."
+      },
+      "goal": "Respond naturally, show whether he is open to catching up, and keep the cafe encounter comfortable."
+    }
+  ],
+  "models": {
+    "env": "default",
+    "agents": [
+      "default",
+      "default"
+    ]
+  },
+  "available_action_types": [
+    "none",
+    "speak",
+    "non-verbal communication",
+    "action",
+    "leave"
+  ],
+  "action_order": "round-robin",
+  "speaker_selection_mode": "willingness",
+  "initial_group_participants": [
+    "Sophie Reed",
+    "Daniel Kim"
+  ],
+  "initial_group_listeners": [],
+  "proximity_schedule": [],
+  "willingness_policy": {
+    "mode": "deterministic_demo",
+    "min_total_turns": 15,
+    "max_total_turns": 20,
+    "max_turns": 20,
+    "low_willingness_end_enabled": true,
+    "low_willingness_threshold": 20,
+    "final_summary_max_words": 70,
+    "exit_agent": "",
+    "exit_turn": 0
+  }
+}

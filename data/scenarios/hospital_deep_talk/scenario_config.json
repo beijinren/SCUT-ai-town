@@ -1,0 +1,214 @@
+{
+  "run_name": "hospital_deep_talk",
+  "scene_id": "hospital_deep_talk",
+  "scene_design_docx": "AI Town 病房交互场景（深度聊天）设计报告.docx",
+  "scene_source": "builtin_registry",
+  "scenario": "In a hospital ward, two people have a quieter, more personal conversation. The protagonist needs to respond with care while respecting emotional limits. 场景目标：The interaction should end with the patient feeling heard and with a small, realistic next step for emotional support.",
+  "location": "hospital_ward",
+  "locations": [
+    "hospital_ward",
+    "bedside_area"
+  ],
+  "action_affordances": [
+    "adjust_bed",
+    "pour_water",
+    "pause_and_listen"
+  ],
+  "scene_object_categories": [
+    "room",
+    "door",
+    "bed",
+    "chair",
+    "bedside_table",
+    "cup",
+    "phone",
+    "curtain",
+    "medicine_cart",
+    "clock",
+    "trash_bin",
+    "window"
+  ],
+  "action_policy": {
+    "mode": "balanced",
+    "force_physical_actions": true,
+    "max_forced_action_agents": 1,
+    "required_physical_action_turns": [
+      5,
+      10
+    ],
+    "force_private_messages": false,
+    "private_message_personal_turn": 0
+  },
+  "time_label": "hospital_deep_talk",
+  "scene_type": "hospital_deep_talk",
+  "protagonist_agent_index": 0,
+  "thinking_mode": "protagonist_only",
+  "personal_goal_judge_enabled": true,
+  "personal_goal_judge_mode": "llm_protagonist_thinking_and_speaking",
+  "goal_judge_model": "default",
+  "goal_judge_fallback_models": [
+    "gpt-5-mini"
+  ],
+  "goal_judge_structured_output": false,
+  "goal_judge_recent_agent_turn_window": 10,
+  "goal_judge_recent_context_turn_window": 3,
+  "goal_judge_timeout_seconds": 200.0,
+  "goal_judge_max_tokens": 400,
+  "goal_judge_litellm_debug": false,
+  "goal_judge_retry_attempts": 4,
+  "goal_judge_retry_delay": 5.0,
+  "persona_divergence_judge_enabled": true,
+  "persona_divergence_judge_model": "default",
+  "persona_divergence_judge_fallback_models": [
+    "gpt-5.2"
+  ],
+  "persona_divergence_judge_max_tokens": 320,
+  "persona_divergence_judge_timeout_seconds": 180.0,
+  "ai_intervention": {
+    "enabled": true,
+    "turns": [],
+    "strategy": "balanced_support",
+    "prompt_length": "sentence",
+    "max_words": 24,
+    "history_max_events": 0,
+    "temperature": 0.2,
+    "need_score_temperature": 0.25,
+    "acceptance_temperature": 0.25,
+    "timeout_seconds": 120.0,
+    "need_score_timeout_seconds": 120.0,
+    "acceptance_timeout_seconds": 120.0,
+    "max_tokens": 180,
+    "need_score_max_tokens": 80,
+    "acceptance_max_tokens": 220
+  },
+  "sotopia_builtin_eval_enabled": false,
+  "models_use_defaults": true,
+  "personallm_eval_enabled": true,
+  "personallm_apply_refinements": true,
+  "personallm_rescore_after_refinement": true,
+  "personallm_refinement_suggestion_mode": "protagonist_post_session",
+  "personallm_model": "default",
+  "identities": [
+    {
+      "identity_id": "rachel_adams_protagonist",
+      "full_name": "Rachel Adams",
+      "age": 34,
+      "gender": "Woman",
+      "occupation": "Patient family member",
+      "scene_role": "protagonist",
+      "identity_summary": "Rachel Adams is a 34-year-old family member visiting someone in the hospital ward.",
+      "what_they_do": "She tries to talk gently, listen well, and avoid turning the conversation into empty reassurance.",
+      "base_goal": "Respond with empathy, invite honest feelings, and help the other person feel less alone without pushing too hard."
+    },
+    {
+      "identity_id": "peter_evans_supporting_agent_1",
+      "full_name": "Peter Evans",
+      "age": 36,
+      "gender": "Man",
+      "occupation": "Hospital patient",
+      "scene_role": "supporting_agent_1",
+      "identity_summary": "Peter Evans is a 36-year-old patient spending time in the hospital ward.",
+      "what_they_do": "He shares worries gradually and responds to whether Rachel feels genuinely present.",
+      "base_goal": "Express what is weighing on him while keeping enough control over a vulnerable conversation."
+    }
+  ],
+  "role_assignments": [
+    {
+      "identity_id": "rachel_adams_protagonist",
+      "personality_template_id": "big5_oh_ch_el_ah_nl",
+      "current_goal": "Respond with empathy, invite honest feelings, and help the other person feel less alone without pushing too hard."
+    },
+    {
+      "identity_id": "peter_evans_supporting_agent_1",
+      "personality_template_id": "big5_oh_ch_el_ah_nh",
+      "current_goal": "Express what is weighing on him while keeping enough control over a vulnerable conversation."
+    }
+  ],
+  "agents": [
+    {
+      "first_name": "Rachel",
+      "last_name": "Adams",
+      "identity_id": "rachel_adams_protagonist",
+      "scene_role": "protagonist",
+      "narrative_role": "protagonist",
+      "identity_summary": "Rachel Adams is a 34-year-old family member visiting someone in the hospital ward.",
+      "what_they_do": "She tries to talk gently, listen well, and avoid turning the conversation into empty reassurance.",
+      "base_goal": "Respond with empathy, invite honest feelings, and help the other person feel less alone without pushing too hard.",
+      "current_goal": "Respond with empathy, invite honest feelings, and help the other person feel less alone without pushing too hard.",
+      "profile": {
+        "age": 34,
+        "occupation": "Patient family member",
+        "gender": "Woman",
+        "gender_pronoun": "he/him",
+        "public_info": "She cares deeply but is unsure how much comfort to offer.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "care",
+          "respect"
+        ],
+        "decision_making_style": "empathetic and careful",
+        "secret": "Rachel Adams privately wants to make progress on this goal: Respond with empathy, invite honest feelings, and help the other person feel less alone without pushing too hard."
+      },
+      "goal": "Respond with empathy, invite honest feelings, and help the other person feel less alone without pushing too hard."
+    },
+    {
+      "first_name": "Peter",
+      "last_name": "Evans",
+      "identity_id": "peter_evans_supporting_agent_1",
+      "scene_role": "supporting_agent_1",
+      "narrative_role": "supporting",
+      "identity_summary": "Peter Evans is a 36-year-old patient spending time in the hospital ward.",
+      "what_they_do": "He shares worries gradually and responds to whether Rachel feels genuinely present.",
+      "base_goal": "Express what is weighing on him while keeping enough control over a vulnerable conversation.",
+      "current_goal": "Express what is weighing on him while keeping enough control over a vulnerable conversation.",
+      "profile": {
+        "age": 36,
+        "occupation": "Hospital patient",
+        "gender": "Man",
+        "gender_pronoun": "he/him",
+        "public_info": "He may want support but does not want to feel pitied.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "dignity",
+          "trust"
+        ],
+        "decision_making_style": "guarded but sincere",
+        "secret": "Peter Evans privately wants to make progress on this goal: Express what is weighing on him while keeping enough control over a vulnerable conversation."
+      },
+      "goal": "Express what is weighing on him while keeping enough control over a vulnerable conversation."
+    }
+  ],
+  "models": {
+    "env": "default",
+    "agents": [
+      "default",
+      "default"
+    ]
+  },
+  "available_action_types": [
+    "none",
+    "speak",
+    "non-verbal communication",
+    "action",
+    "leave"
+  ],
+  "action_order": "round-robin",
+  "speaker_selection_mode": "willingness",
+  "initial_group_participants": [
+    "Rachel Adams",
+    "Peter Evans"
+  ],
+  "initial_group_listeners": [],
+  "proximity_schedule": [],
+  "willingness_policy": {
+    "mode": "deterministic_demo",
+    "min_total_turns": 15,
+    "max_total_turns": 20,
+    "max_turns": 20,
+    "low_willingness_end_enabled": true,
+    "low_willingness_threshold": 20,
+    "final_summary_max_words": 70,
+    "exit_agent": "",
+    "exit_turn": 0
+  }
+}

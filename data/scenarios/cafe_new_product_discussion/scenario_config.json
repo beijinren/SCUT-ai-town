@@ -1,0 +1,260 @@
+{
+  "run_name": "cafe_new_product_discussion",
+  "scene_id": "cafe_new_product_discussion",
+  "scene_design_docx": "AI Town 咖啡馆交互场景（新品讨论）设计报告.docx",
+  "scene_source": "builtin_registry",
+  "scenario": "In a cafe, a small group is discussing a new drink or product idea. The protagonist needs to gather reactions and turn casual opinions into useful feedback. 场景目标：The group should end with a concise set of product feedback points about taste, presentation, price, and likely customer interest.",
+  "location": "coffee_shop",
+  "locations": [
+    "coffee_shop",
+    "queue_area",
+    "activity_area"
+  ],
+  "action_affordances": [
+    "read_menu",
+    "compare_drinks",
+    "point_to_board"
+  ],
+  "scene_object_categories": [
+    "room",
+    "door",
+    "counter",
+    "menu",
+    "table",
+    "chair",
+    "cup",
+    "phone",
+    "payment_terminal",
+    "tray",
+    "trash_bin",
+    "plant",
+    "clock"
+  ],
+  "action_policy": {
+    "mode": "balanced",
+    "force_physical_actions": true,
+    "max_forced_action_agents": 1,
+    "required_physical_action_turns": [
+      5,
+      10
+    ],
+    "force_private_messages": false,
+    "private_message_personal_turn": 0
+  },
+  "time_label": "cafe_new_product_discussion",
+  "scene_type": "cafe_new_product_discussion",
+  "protagonist_agent_index": 0,
+  "thinking_mode": "protagonist_only",
+  "personal_goal_judge_enabled": true,
+  "personal_goal_judge_mode": "llm_protagonist_thinking_and_speaking",
+  "goal_judge_model": "default",
+  "goal_judge_fallback_models": [
+    "gpt-5-mini"
+  ],
+  "goal_judge_structured_output": false,
+  "goal_judge_recent_agent_turn_window": 10,
+  "goal_judge_recent_context_turn_window": 3,
+  "goal_judge_timeout_seconds": 200.0,
+  "goal_judge_max_tokens": 400,
+  "goal_judge_litellm_debug": false,
+  "goal_judge_retry_attempts": 4,
+  "goal_judge_retry_delay": 5.0,
+  "persona_divergence_judge_enabled": true,
+  "persona_divergence_judge_model": "default",
+  "persona_divergence_judge_fallback_models": [
+    "gpt-5.2"
+  ],
+  "persona_divergence_judge_max_tokens": 320,
+  "persona_divergence_judge_timeout_seconds": 180.0,
+  "ai_intervention": {
+    "enabled": true,
+    "turns": [],
+    "strategy": "balanced_support",
+    "prompt_length": "sentence",
+    "max_words": 24,
+    "history_max_events": 0,
+    "temperature": 0.2,
+    "need_score_temperature": 0.25,
+    "acceptance_temperature": 0.25,
+    "timeout_seconds": 120.0,
+    "need_score_timeout_seconds": 120.0,
+    "acceptance_timeout_seconds": 120.0,
+    "max_tokens": 180,
+    "need_score_max_tokens": 80,
+    "acceptance_max_tokens": 220
+  },
+  "sotopia_builtin_eval_enabled": false,
+  "models_use_defaults": true,
+  "personallm_eval_enabled": true,
+  "personallm_apply_refinements": true,
+  "personallm_rescore_after_refinement": true,
+  "personallm_refinement_suggestion_mode": "protagonist_post_session",
+  "personallm_model": "default",
+  "identities": [
+    {
+      "identity_id": "maya_johnson_protagonist",
+      "full_name": "Maya Johnson",
+      "age": 28,
+      "gender": "Woman",
+      "occupation": "Cafe shift manager",
+      "scene_role": "protagonist",
+      "identity_summary": "Maya Johnson is a 28-year-old cafe shift manager leading a discussion about a new cafe product.",
+      "what_they_do": "She asks for concrete feedback and tries to decide whether the product is ready to promote.",
+      "base_goal": "Guide the discussion toward practical feedback on taste, name, price, presentation, and whether customers would order it."
+    },
+    {
+      "identity_id": "leo_martin_supporting_agent_1",
+      "full_name": "Leo Martin",
+      "age": 24,
+      "gender": "Man",
+      "occupation": "Barista",
+      "scene_role": "supporting_agent_1",
+      "identity_summary": "Leo Martin is a 24-year-old barista who understands preparation time and customer ordering habits.",
+      "what_they_do": "He comments on workflow, ingredients, and how easy the product is to make during busy hours.",
+      "base_goal": "Point out preparation constraints and suggest changes that make the product easier to serve consistently."
+    },
+    {
+      "identity_id": "nora_scott_supporting_agent_2",
+      "full_name": "Nora Scott",
+      "age": 22,
+      "gender": "Woman",
+      "occupation": "Student customer",
+      "scene_role": "supporting_agent_2",
+      "identity_summary": "Nora Scott is a 22-year-old student customer invited to give a casual reaction.",
+      "what_they_do": "She reacts as a likely customer and notices price, appearance, and whether the product feels appealing.",
+      "base_goal": "Give honest customer-side feedback about whether the new product feels worth buying."
+    }
+  ],
+  "role_assignments": [
+    {
+      "identity_id": "maya_johnson_protagonist",
+      "personality_template_id": "big5_oh_ch_eh_ah_nl",
+      "current_goal": "Guide the discussion toward practical feedback on taste, name, price, presentation, and whether customers would order it."
+    },
+    {
+      "identity_id": "leo_martin_supporting_agent_1",
+      "personality_template_id": "big5_oh_cl_eh_al_nl",
+      "current_goal": "Point out preparation constraints and suggest changes that make the product easier to serve consistently."
+    },
+    {
+      "identity_id": "nora_scott_supporting_agent_2",
+      "personality_template_id": "big5_oh_ch_el_ah_nl",
+      "current_goal": "Give honest customer-side feedback about whether the new product feels worth buying."
+    }
+  ],
+  "agents": [
+    {
+      "first_name": "Maya",
+      "last_name": "Johnson",
+      "identity_id": "maya_johnson_protagonist",
+      "scene_role": "protagonist",
+      "narrative_role": "protagonist",
+      "identity_summary": "Maya Johnson is a 28-year-old cafe shift manager leading a discussion about a new cafe product.",
+      "what_they_do": "She asks for concrete feedback and tries to decide whether the product is ready to promote.",
+      "base_goal": "Guide the discussion toward practical feedback on taste, name, price, presentation, and whether customers would order it.",
+      "current_goal": "Guide the discussion toward practical feedback on taste, name, price, presentation, and whether customers would order it.",
+      "profile": {
+        "age": 28,
+        "occupation": "Cafe shift manager",
+        "gender": "Woman",
+        "gender_pronoun": "he/him",
+        "public_info": "She is responsible for turning opinions into usable product decisions.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "quality",
+          "practicality"
+        ],
+        "decision_making_style": "structured and customer-focused",
+        "secret": "Maya Johnson privately wants to make progress on this goal: Guide the discussion toward practical feedback on taste, name, price, presentation, and whether customers would order it."
+      },
+      "goal": "Guide the discussion toward practical feedback on taste, name, price, presentation, and whether customers would order it."
+    },
+    {
+      "first_name": "Leo",
+      "last_name": "Martin",
+      "identity_id": "leo_martin_supporting_agent_1",
+      "scene_role": "supporting_agent_1",
+      "narrative_role": "supporting",
+      "identity_summary": "Leo Martin is a 24-year-old barista who understands preparation time and customer ordering habits.",
+      "what_they_do": "He comments on workflow, ingredients, and how easy the product is to make during busy hours.",
+      "base_goal": "Point out preparation constraints and suggest changes that make the product easier to serve consistently.",
+      "current_goal": "Point out preparation constraints and suggest changes that make the product easier to serve consistently.",
+      "profile": {
+        "age": 24,
+        "occupation": "Barista",
+        "gender": "Man",
+        "gender_pronoun": "he/him",
+        "public_info": "He sees the product through daily cafe operations.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "efficiency",
+          "consistency"
+        ],
+        "decision_making_style": "hands-on and operational",
+        "secret": "Leo Martin privately wants to make progress on this goal: Point out preparation constraints and suggest changes that make the product easier to serve consistently."
+      },
+      "goal": "Point out preparation constraints and suggest changes that make the product easier to serve consistently."
+    },
+    {
+      "first_name": "Nora",
+      "last_name": "Scott",
+      "identity_id": "nora_scott_supporting_agent_2",
+      "scene_role": "supporting_agent_2",
+      "narrative_role": "supporting",
+      "identity_summary": "Nora Scott is a 22-year-old student customer invited to give a casual reaction.",
+      "what_they_do": "She reacts as a likely customer and notices price, appearance, and whether the product feels appealing.",
+      "base_goal": "Give honest customer-side feedback about whether the new product feels worth buying.",
+      "current_goal": "Give honest customer-side feedback about whether the new product feels worth buying.",
+      "profile": {
+        "age": 22,
+        "occupation": "Student customer",
+        "gender": "Woman",
+        "gender_pronoun": "he/him",
+        "public_info": "She represents a regular student customer's perspective.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "honesty",
+          "value"
+        ],
+        "decision_making_style": "direct and experience-based",
+        "secret": "Nora Scott privately wants to make progress on this goal: Give honest customer-side feedback about whether the new product feels worth buying."
+      },
+      "goal": "Give honest customer-side feedback about whether the new product feels worth buying."
+    }
+  ],
+  "models": {
+    "env": "default",
+    "agents": [
+      "default",
+      "default",
+      "default"
+    ]
+  },
+  "available_action_types": [
+    "none",
+    "speak",
+    "non-verbal communication",
+    "action",
+    "leave"
+  ],
+  "action_order": "round-robin",
+  "speaker_selection_mode": "willingness",
+  "initial_group_participants": [
+    "Maya Johnson",
+    "Leo Martin",
+    "Nora Scott"
+  ],
+  "initial_group_listeners": [],
+  "proximity_schedule": [],
+  "willingness_policy": {
+    "mode": "deterministic_demo",
+    "min_total_turns": 15,
+    "max_total_turns": 20,
+    "max_turns": 20,
+    "low_willingness_end_enabled": true,
+    "low_willingness_threshold": 20,
+    "final_summary_max_words": 70,
+    "exit_agent": "",
+    "exit_turn": 0
+  }
+}

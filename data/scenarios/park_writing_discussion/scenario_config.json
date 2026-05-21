@@ -1,0 +1,214 @@
+{
+  "run_name": "park_writing_discussion",
+  "scene_id": "park_writing_discussion",
+  "scene_design_docx": "AI Town 公园交互场景（写作讨论）设计报告.docx",
+  "scene_source": "builtin_registry",
+  "scenario": "In a park, two people are discussing a writing draft while sitting near a bench. The protagonist wants feedback that is useful but not discouraging. 场景目标：The discussion should end with a concrete revision direction and a more confident sense of what the draft should become.",
+  "location": "park",
+  "locations": [
+    "park",
+    "walkway",
+    "bench_area"
+  ],
+  "action_affordances": [
+    "sit_on_bench",
+    "check_notes",
+    "walk_and_talk"
+  ],
+  "scene_object_categories": [
+    "walkway",
+    "bench",
+    "tree",
+    "grass",
+    "notebook",
+    "pen",
+    "phone",
+    "cup",
+    "trash_bin",
+    "sign",
+    "lamp"
+  ],
+  "action_policy": {
+    "mode": "balanced",
+    "force_physical_actions": true,
+    "max_forced_action_agents": 1,
+    "required_physical_action_turns": [
+      5,
+      10
+    ],
+    "force_private_messages": false,
+    "private_message_personal_turn": 0
+  },
+  "time_label": "park_writing_discussion",
+  "scene_type": "park_writing_discussion",
+  "protagonist_agent_index": 0,
+  "thinking_mode": "protagonist_only",
+  "personal_goal_judge_enabled": true,
+  "personal_goal_judge_mode": "llm_protagonist_thinking_and_speaking",
+  "goal_judge_model": "default",
+  "goal_judge_fallback_models": [
+    "gpt-5-mini"
+  ],
+  "goal_judge_structured_output": false,
+  "goal_judge_recent_agent_turn_window": 10,
+  "goal_judge_recent_context_turn_window": 3,
+  "goal_judge_timeout_seconds": 200.0,
+  "goal_judge_max_tokens": 400,
+  "goal_judge_litellm_debug": false,
+  "goal_judge_retry_attempts": 4,
+  "goal_judge_retry_delay": 5.0,
+  "persona_divergence_judge_enabled": true,
+  "persona_divergence_judge_model": "default",
+  "persona_divergence_judge_fallback_models": [
+    "gpt-5.2"
+  ],
+  "persona_divergence_judge_max_tokens": 320,
+  "persona_divergence_judge_timeout_seconds": 180.0,
+  "ai_intervention": {
+    "enabled": true,
+    "turns": [],
+    "strategy": "balanced_support",
+    "prompt_length": "sentence",
+    "max_words": 24,
+    "history_max_events": 0,
+    "temperature": 0.2,
+    "need_score_temperature": 0.25,
+    "acceptance_temperature": 0.25,
+    "timeout_seconds": 120.0,
+    "need_score_timeout_seconds": 120.0,
+    "acceptance_timeout_seconds": 120.0,
+    "max_tokens": 180,
+    "need_score_max_tokens": 80,
+    "acceptance_max_tokens": 220
+  },
+  "sotopia_builtin_eval_enabled": false,
+  "models_use_defaults": true,
+  "personallm_eval_enabled": true,
+  "personallm_apply_refinements": true,
+  "personallm_rescore_after_refinement": true,
+  "personallm_refinement_suggestion_mode": "protagonist_post_session",
+  "personallm_model": "default",
+  "identities": [
+    {
+      "identity_id": "iris_walker_protagonist",
+      "full_name": "Iris Walker",
+      "age": 26,
+      "gender": "Woman",
+      "occupation": "Writer",
+      "scene_role": "protagonist",
+      "identity_summary": "Iris Walker is a 26-year-old writer discussing a draft in the park.",
+      "what_they_do": "She explains what she is trying to write and asks for useful feedback.",
+      "base_goal": "Get specific feedback on the draft's direction, protect her confidence, and decide the next revision step."
+    },
+    {
+      "identity_id": "caleb_young_supporting_agent_1",
+      "full_name": "Caleb Young",
+      "age": 27,
+      "gender": "Man",
+      "occupation": "Editor",
+      "scene_role": "supporting_agent_1",
+      "identity_summary": "Caleb Young is a 27-year-old editor giving feedback on Iris's draft.",
+      "what_they_do": "He identifies what is strong, what is unclear, and what revision path might help.",
+      "base_goal": "Give feedback that is specific, honest, and encouraging enough to help Iris revise."
+    }
+  ],
+  "role_assignments": [
+    {
+      "identity_id": "iris_walker_protagonist",
+      "personality_template_id": "big5_oh_ch_el_ah_nl",
+      "current_goal": "Get specific feedback on the draft's direction, protect her confidence, and decide the next revision step."
+    },
+    {
+      "identity_id": "caleb_young_supporting_agent_1",
+      "personality_template_id": "big5_oh_ch_el_ah_nl",
+      "current_goal": "Give feedback that is specific, honest, and encouraging enough to help Iris revise."
+    }
+  ],
+  "agents": [
+    {
+      "first_name": "Iris",
+      "last_name": "Walker",
+      "identity_id": "iris_walker_protagonist",
+      "scene_role": "protagonist",
+      "narrative_role": "protagonist",
+      "identity_summary": "Iris Walker is a 26-year-old writer discussing a draft in the park.",
+      "what_they_do": "She explains what she is trying to write and asks for useful feedback.",
+      "base_goal": "Get specific feedback on the draft's direction, protect her confidence, and decide the next revision step.",
+      "current_goal": "Get specific feedback on the draft's direction, protect her confidence, and decide the next revision step.",
+      "profile": {
+        "age": 26,
+        "occupation": "Writer",
+        "gender": "Woman",
+        "gender_pronoun": "he/him",
+        "public_info": "She cares about the draft but is unsure whether the idea is working.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "creativity",
+          "growth"
+        ],
+        "decision_making_style": "reflective and open",
+        "secret": "Iris Walker privately wants to make progress on this goal: Get specific feedback on the draft's direction, protect her confidence, and decide the next revision step."
+      },
+      "goal": "Get specific feedback on the draft's direction, protect her confidence, and decide the next revision step."
+    },
+    {
+      "first_name": "Caleb",
+      "last_name": "Young",
+      "identity_id": "caleb_young_supporting_agent_1",
+      "scene_role": "supporting_agent_1",
+      "narrative_role": "supporting",
+      "identity_summary": "Caleb Young is a 27-year-old editor giving feedback on Iris's draft.",
+      "what_they_do": "He identifies what is strong, what is unclear, and what revision path might help.",
+      "base_goal": "Give feedback that is specific, honest, and encouraging enough to help Iris revise.",
+      "current_goal": "Give feedback that is specific, honest, and encouraging enough to help Iris revise.",
+      "profile": {
+        "age": 27,
+        "occupation": "Editor",
+        "gender": "Man",
+        "gender_pronoun": "he/him",
+        "public_info": "He is comfortable discussing writing craft in plain language.",
+        "big_five": "Assigned from the Big Five persona library at runtime.",
+        "moral_values": [
+          "honesty",
+          "support"
+        ],
+        "decision_making_style": "analytical and encouraging",
+        "secret": "Caleb Young privately wants to make progress on this goal: Give feedback that is specific, honest, and encouraging enough to help Iris revise."
+      },
+      "goal": "Give feedback that is specific, honest, and encouraging enough to help Iris revise."
+    }
+  ],
+  "models": {
+    "env": "default",
+    "agents": [
+      "default",
+      "default"
+    ]
+  },
+  "available_action_types": [
+    "none",
+    "speak",
+    "non-verbal communication",
+    "action",
+    "leave"
+  ],
+  "action_order": "round-robin",
+  "speaker_selection_mode": "willingness",
+  "initial_group_participants": [
+    "Iris Walker",
+    "Caleb Young"
+  ],
+  "initial_group_listeners": [],
+  "proximity_schedule": [],
+  "willingness_policy": {
+    "mode": "deterministic_demo",
+    "min_total_turns": 15,
+    "max_total_turns": 20,
+    "max_turns": 20,
+    "low_willingness_end_enabled": true,
+    "low_willingness_threshold": 20,
+    "final_summary_max_words": 70,
+    "exit_agent": "",
+    "exit_turn": 0
+  }
+}

@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { insertInput } from './aiTown/insertInput';
-import { conversationId, playerId } from './aiTown/ids';
+import { GameId, conversationId, playerId } from './aiTown/ids';
 import { recordMessagePropagation } from './aiTown/informationGraphBridge';
 
 export const listMessages = query({
@@ -60,7 +60,7 @@ export const writeMessage = mutation({
     await recordMessagePropagation(ctx, {
       worldId: args.worldId,
       sceneId: world.sceneState?.sceneId,
-      conversationId: args.conversationId,
+      conversationId: args.conversationId as GameId<'conversations'>,
       messageUuid: args.messageUuid,
       text: args.text,
       speakerAgentId,

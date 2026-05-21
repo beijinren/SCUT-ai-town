@@ -614,7 +614,7 @@ export const agentSendMessage = internalMutation({
     await recordMessagePropagation(ctx, {
       worldId: args.worldId,
       sceneId: world.sceneState?.sceneId,
-      conversationId: args.conversationId,
+      conversationId: args.conversationId as GameId<'conversations'>,
       messageUuid: args.messageUuid,
       text: args.text,
       speakerAgentId: args.agentId,
