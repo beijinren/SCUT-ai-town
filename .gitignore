@@ -57,3 +57,31 @@ build/
 
 # 不上传的文档目录
 docs/
+
+# 文档目录
+docs/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# 本地环境
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# IDE / 系统文件
+.idea/
+.vscode/
+.DS_Store
+
+# 前端依赖和构建产物
+node_modules/
+dist/
+build/
