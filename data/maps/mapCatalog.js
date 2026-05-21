@@ -26,6 +26,7 @@
  *   collisionLayers?: string[];
  *   blockedRects?: Array<{ minX: number; minY: number; maxX: number; maxY: number }>;
  *   spawnRoleBindings?: Record<string, string>;
+ *   defaultAgentCount?: number;
  *   runtimeTuning?: MapRuntimeTuning;
  * }} MapDefinition
  */
@@ -80,6 +81,29 @@ export const mapCatalog = {
     renderObjectLayers: DEFAULT_RENDER_OBJECT_LAYERS,
     collisionLayers: DEFAULT_COLLISION_LAYERS,
     blockedRects: [],
+    runtimeTuning: {
+      playerRenderScale: 1.5,
+      defaultZoomMultiplier: 1.38,
+      minZoomMultiplier: 0.75,
+      maxZoomMultiplier: 2.5,
+      playerCollisionThreshold: 1.2,
+      conversationDistance: 1.3,
+    },
+  },
+  cafe_room: {
+    mapId: 'cafe_room',
+    sceneTemplateId: 'casual-common-area',
+    exportedSceneId: 'cafe_room',
+    exportedSceneName: 'Cafe Room',
+    inputJson: 'data/maps/cafe_room/cafe_room.json',
+    outputModule: 'data/maps/generated/cafeRoom.ts',
+    tilesetPath: '/ai-town/assets/maps/cafe_room/cafe_room_tileset.png',
+    tilesetSourceFile: 'public/assets/maps/cafe_room/cafe_room_tileset.png',
+    renderBackgroundLayers: ['bgtiles'],
+    renderObjectLayers: ['wall', 'obj_bot', 'objmap', 'obj_top', 'decoration'],
+    collisionLayers: DEFAULT_COLLISION_LAYERS,
+    blockedRects: [],
+    defaultAgentCount: 3,
     runtimeTuning: {
       playerRenderScale: 1.5,
       defaultZoomMultiplier: 1.38,

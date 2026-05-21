@@ -40,6 +40,12 @@ export default PixiComponent('Viewport', {
     if (viewportRef) {
       viewportRef.current = viewport;
     }
+    const snapViewportPosition = () => {
+      viewport.position.set(
+        Math.round(viewport.position.x),
+        Math.round(viewport.position.y),
+      );
+    };
     // Activate plugins
     viewport
       .drag()
@@ -52,6 +58,9 @@ export default PixiComponent('Viewport', {
         minScale,
         maxScale,
       });
+    viewport.on('moved', snapViewportPosition);
+    viewport.on('zoomed', snapViewportPosition);
+    snapViewportPosition();
     return viewport;
   },
   applyProps(viewport, oldProps: any, newProps: any) {

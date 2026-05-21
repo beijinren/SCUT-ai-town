@@ -5426,7 +5426,7 @@ export const markers = [
     "id": "spawn_family_1",
     "type": "Spawn",
     "x": 10,
-    "y": 14,
+    "y": 13,
     "role": "family_member",
     "targetObjectId": "",
     "tags": [
@@ -5435,12 +5435,12 @@ export const markers = [
     ],
     "description": "家属 1 的初始出生位置。",
     "unityX": -6,
-    "unityY": -9
+    "unityY": -8
   },
   {
     "id": "spawn_family_2",
     "type": "Spawn",
-    "x": 21,
+    "x": 22,
     "y": 7,
     "role": "family_member",
     "targetObjectId": "",
@@ -5449,7 +5449,7 @@ export const markers = [
       "family"
     ],
     "description": "家属 2 的初始出生位置。",
-    "unityX": 5,
+    "unityX": 6,
     "unityY": -2
   },
   {

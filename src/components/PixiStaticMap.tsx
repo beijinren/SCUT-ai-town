@@ -61,6 +61,7 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
         const ctile = new PIXI.Sprite(tiles[tileIndex]);
         ctile.x = xPx;
         ctile.y = yPx;
+        ctile.roundPixels = true;
         container.addChild(ctile);
       }
     }
@@ -99,6 +100,7 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
           pixiSprite.y = sprite.y;
           pixiSprite.width = sprite.w;
           pixiSprite.height = sprite.h;
+          pixiSprite.roundPixels = true;
           container.addChild(pixiSprite);
           pixiSprite.play();
         }

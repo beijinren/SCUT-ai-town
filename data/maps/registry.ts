@@ -1,5 +1,6 @@
 import * as interviewRoom from './interview_room/interviewRoomMap';
 import * as hospitalWard from './hospital_ward/hospitalWardMap';
+import * as cafeRoom from './cafe_room/cafeRoomMap';
 import { DEFAULT_MAP_ID as DEFAULT_CATALOG_MAP_ID, getMapDefinition } from './mapCatalog.js';
 
 export const DEFAULT_MAP_ID = DEFAULT_CATALOG_MAP_ID;
@@ -7,6 +8,7 @@ export const DEFAULT_MAP_ID = DEFAULT_CATALOG_MAP_ID;
 export const mapRegistry = {
   interview_room: interviewRoom,
   hospital_ward: hospitalWard,
+  cafe_room: cafeRoom,
 };
 
 export type MapId = keyof typeof mapRegistry;

@@ -22,6 +22,17 @@ import {
   getMinZoomMultiplier,
 } from '../../convex/aiTown/mapRuntimeTuning.ts';
 
+function snapPixelScale(scale: number) {
+  if (scale >= 1) {
+    return Math.max(1, Math.round(scale));
+  }
+  return Math.max(0.5, Math.round(scale * 4) / 4);
+}
+
+function snapPixelPosition(position: number) {
+  return Math.round(position);
+}
+
 export const PixiGame = (props: {
   worldId: Id<"worlds">;
   engineId: Id<"engines">;
@@ -99,12 +110,28 @@ export const PixiGame = (props: {
     props.width / Math.max(worldWidthPx, 1),
     props.height / Math.max(worldHeightPx, 1),
   );
-  const minViewportScale = Math.max(0.5, fitScale * getMinZoomMultiplier(props.game.worldMap));
-  const defaultViewportScale = Math.max(
-    minViewportScale,
+  const rawMinViewportScale = Math.max(
+    0.5,
+    fitScale * getMinZoomMultiplier(props.game.worldMap),
+  );
+  const rawDefaultViewportScale = Math.max(
+    rawMinViewportScale,
     fitScale * getDefaultZoomMultiplier(props.game.worldMap),
   );
-  const maxViewportScale = Math.max(3.0, fitScale * getMaxZoomMultiplier(props.game.worldMap));
+  const rawMaxViewportScale = Math.max(
+    rawDefaultViewportScale,
+    fitScale * getMaxZoomMultiplier(props.game.worldMap),
+  );
+  // 像素风地图尽量贴近整数倍缩放，减少纹理发糊和局部“像错位”的观感。
+  const minViewportScale = snapPixelScale(rawMinViewportScale);
+  const defaultViewportScale = Math.max(
+    minViewportScale,
+    snapPixelScale(rawDefaultViewportScale),
+  );
+  const maxViewportScale = Math.max(
+    defaultViewportScale,
+    snapPixelScale(rawMaxViewportScale),
+  );
   const players = [...props.game.world.players.values()];
 
   // Zoom on the user’s avatar when it is created
@@ -114,8 +141,8 @@ export const PixiGame = (props: {
     const humanPlayer = props.game.world.players.get(humanPlayerId)!;
     viewportRef.current.animate({
       position: new PIXI.Point(
-        humanPlayer.position.x * tileDim,
-        humanPlayer.position.y * tileDim,
+        snapPixelPosition(humanPlayer.position.x * tileDim),
+        snapPixelPosition(humanPlayer.position.y * tileDim),
       ),
       scale: defaultViewportScale,
     });
@@ -131,8 +158,8 @@ export const PixiGame = (props: {
     }
     viewportRef.current.animate({
       position: new PIXI.Point(
-        focusPlayer.position.x * tileDim,
-        focusPlayer.position.y * tileDim,
+        snapPixelPosition(focusPlayer.position.x * tileDim),
+        snapPixelPosition(focusPlayer.position.y * tileDim),
       ),
       scale: defaultViewportScale,
     });

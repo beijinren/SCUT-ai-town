@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import * as PIXI from "pixi.js";
 import PixiGame from "./PixiGame.tsx";
 
 import { useElementSize } from "usehooks-ts";
@@ -21,6 +22,9 @@ export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 const SHOW_DEV_RESET_BUTTON = import.meta.env.DEV;
 
 export default function Game() {
+  PIXI.settings.ROUND_PIXELS = true;
+  const deviceResolution =
+    typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   const convex = useConvex();
   const [selectedElement, setSelectedElement] = useState<{
     kind: "player";
@@ -81,7 +85,12 @@ export default function Game() {
               <Stage
                 width={width}
                 height={height}
-                options={{ backgroundColor: 0x7ab5ff }}
+                options={{
+                  backgroundColor: 0x7ab5ff,
+                  antialias: false,
+                  autoDensity: true,
+                  resolution: deviceResolution,
+                }}
               >
                 {/* Re-propagate context because contexts are not shared between renderers.
 https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-531549215 */}

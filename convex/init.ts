@@ -44,7 +44,8 @@ const init = mutation({
     );
     if (shouldCreate) {
       const defaultAgentCount =
-        spawnAssignments.length > 0 ? spawnAssignments.length : initialAgentDescriptions.length;
+        mapDefinition.defaultAgentCount ??
+        (spawnAssignments.length > 0 ? spawnAssignments.length : initialAgentDescriptions.length);
       const toCreate = args.numAgents !== undefined ? args.numAgents : defaultAgentCount;
       for (let i = 0; i < toCreate; i++) {
         const assignment = spawnAssignments[i];
